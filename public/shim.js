@@ -99,31 +99,67 @@
     async list() { return { assets: [], usage: {} }; }
   };
 
-  // ---- certificate reading (server-side Anthropic call) ----
-  let ocr = false;
+  // ---- certificate reading ----
+  // Preferred: server-side Anthropic call (ANTHROPIC_API_KEY set). Fallback:
+  // free in-browser OCR (Tesseract) tuned to the CAAT card's printed layout —
+  // no key needed, works best on a straight, well-lit photo of the card.
+  let serverOcr = false;
+  async function browserOcrRead(img) {
+    if (!window.Tesseract) {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js";
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const { data } = await Tesseract.recognize(img, "eng");
+    const text = data.text || "";
+    const fixDate = (d, m, y) => {
+      y = +y; if (y > 2400) y -= 543; // Thai Buddhist era → Gregorian
+      return y + "-" + String(+m).padStart(2, "0") + "-" + String(+d).padStart(2, "0");
+    };
+    const out = {};
+    let m = text.match(/Certificate\s*No\.?\s*\)?\s*:?\s*([A-Z]{0,3}\s?\d[\w\/\-]*)/i) || text.match(/\b([A-Z]\d{5,}\/\d{4})\b/);
+    if (m) out.certNo = m[1].replace(/\s+/g, "");
+    m = text.match(/Issue\s*\)?\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+    if (m) out.issueDate = fixDate(m[1], m[2], m[3]);
+    m = text.match(/Expiry\s*\)?\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+    if (m) out.expiryDate = fixDate(m[1], m[2], m[3]);
+    m = text.match(/Weight\s*not\s*exceeding\s*(\d+)\s*kg/i);
+    if (m) out.certType = "UAV weight not exceeding " + m[1] + " kg";
+    m = text.match(/Name[\s\-–]*Surname\s*:?\s*([A-Za-z.' \-]{3,60})/i);
+    if (m) out.name = m[1].trim();
+    if (!out.certNo && !out.issueDate && !out.expiryDate) throw { code: "invalid_json", message: "could not read the photo" };
+    return out;
+  }
   function sampleFn() { return Promise.reject({ code: "not_granted", message: "text sampling not available here" }); }
   sampleFn.limits = async () => ({
     maxPromptBytes: 262144,
-    ...(ocr ? { images: { maxCount: 1, maxInputBytes: 20 * 1024 * 1024, mediaTypes: ["image/jpeg", "image/png", "image/webp"] } } : {})
+    images: { maxCount: 1, maxInputBytes: 20 * 1024 * 1024, mediaTypes: ["image/jpeg", "image/png", "image/webp"] }
   });
   sampleFn.json = async (prompt, opts) => {
     const img = opts && opts.images && (opts.images[0] || opts.images);
     if (!img) throw { code: "invalid_request", message: "image required" };
-    const b64 = await new Promise((res, rej) => {
-      const fr = new FileReader();
-      fr.onload = () => res(String(fr.result).split(",")[1]);
-      fr.onerror = rej;
-      fr.readAsDataURL(img);
-    });
-    const r = await api("POST", "/api/ocr", { prompt, media_type: img.type || "image/jpeg", data: b64 });
-    if (r.json == null) throw { code: "invalid_json", message: "no JSON in reply" };
-    return r.json;
+    if (serverOcr) {
+      try {
+        const b64 = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(String(fr.result).split(",")[1]);
+          fr.onerror = rej;
+          fr.readAsDataURL(img);
+        });
+        const r = await api("POST", "/api/ocr", { prompt, media_type: img.type || "image/jpeg", data: b64 });
+        if (r.json != null) return r.json;
+      } catch (e) { /* fall through to browser OCR */ }
+    }
+    return browserOcrRead(img);
   };
 
   // ---- boot ----
   const ready = (async () => {
     try { role = (await (await fetch("/api/me", { credentials: "same-origin" })).json()).role; } catch (e) {}
-    try { ocr = !!(await (await fetch("/api/config")).json()).ocr; } catch (e) {}
+    try { serverOcr = !!(await (await fetch("/api/config")).json()).ocr; } catch (e) {}
   })();
 
   window.claude = {
@@ -132,7 +168,7 @@
       if (name === "db") return role ? dbNs : null;
       if (name === "user") return userNs;
       if (name === "assets") return role ? assetsNs : null;
-      if (name === "sample") return ocr && role ? sampleFn : null;
+      if (name === "sample") return sampleFn; // browser OCR works with or without the server key
       return null;
     }
   };

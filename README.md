@@ -37,8 +37,11 @@ The whole UI is one file, `fleet-asset-register.html`. It runs in two ways:
      `reports`, `permits`, `missions`, `loans`, `pilots`, `sops`, `sopacks`),
      polled every 8 s in place of realtime snapshots.
    - File store in `DATA_DIR/uploads/`, served at `/_blob/<id>` (sign-in required).
-   - Optional certificate OCR: `POST /api/ocr` forwards the photo to the Anthropic
-     API when `ANTHROPIC_API_KEY` is set; without it the page falls back to manual entry.
+   - Certificate photo reading works without any key: free in-browser OCR
+     (Tesseract) tuned to the CAAT card's printed layout, including Buddhist-era
+     date conversion. Setting `ANTHROPIC_API_KEY` upgrades it to Claude vision
+     via `POST /api/ocr` (more accurate, handles poor photos and other layouts);
+     if the server call fails the page falls back to browser OCR automatically.
 
 ## Running locally
 
