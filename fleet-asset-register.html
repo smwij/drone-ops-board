@@ -1,0 +1,2239 @@
+<title>Fleet Asset Register</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: ops-board — tabbed views (assets / flight log / reports / permissions), summary tiles up top of each, card grids below. */
+:root{
+  --bg:#eef1f4;
+  --surface:#ffffff;
+  --surface-2:#f6f8fa;
+  --fg:#18232c;
+  --muted:#5c6c78;
+  --line:#d4dce2;
+  --accent:#0e5e83;
+  --accent-fg:#ffffff;
+  --tag-green:#2e7d4f;
+  --tag-green-soft:#e3f1e8;
+  --tag-red:#bd2f2a;
+  --tag-red-soft:#f9e7e5;
+  --amber:#a66a12;
+  --amber-soft:#f8eed9;
+  --tag-white-fill:#ffffff;
+  --tag-white-ink:#18232c;
+  --font-display:'Barlow Condensed',system-ui,sans-serif;
+  --font-body:'Barlow',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101820; --surface:#1a2530; --surface-2:#15202a;
+    --fg:#e7edf2; --muted:#92a3b0; --line:#2c3b48;
+    --accent:#51a8cd; --accent-fg:#0c1319;
+    --tag-green:#4db57e; --tag-green-soft:#1d3528;
+    --tag-red:#e2635a; --tag-red-soft:#402224;
+    --amber:#d9a04b; --amber-soft:#3a2f1c;
+    --tag-white-fill:#eef2f5; --tag-white-ink:#18232c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101820; --surface:#1a2530; --surface-2:#15202a;
+  --fg:#e7edf2; --muted:#92a3b0; --line:#2c3b48;
+  --accent:#51a8cd; --accent-fg:#0c1319;
+  --tag-green:#4db57e; --tag-green-soft:#1d3528;
+  --tag-red:#e2635a; --tag-red-soft:#402224;
+  --amber:#d9a04b; --amber-soft:#3a2f1c;
+  --tag-white-fill:#eef2f5; --tag-white-ink:#18232c;
+  color-scheme:dark;
+}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:var(--font-body); font-size:15px; line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 48px;
+}
+.wrap{max-width:1080px;margin:0 auto}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+/* Header */
+header{padding-block:28px 14px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+.eyebrow{font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(30px,5vw,42px);line-height:1.05;margin:2px 0 4px;text-wrap:balance}
+.sub{color:var(--muted);max-width:56ch;margin:0}
+.ro-pill{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+
+/* Tabs */
+nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:0}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:8px 10px 10px;cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:.03em;color:var(--muted);display:flex;align-items:center;gap:7px}
+.tab:hover{color:var(--fg)}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+.tab .count{font-family:var(--font-body);font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 7px;background:var(--surface);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.tab .count.alert{background:var(--tag-red);border-color:var(--tag-red);color:#fff}
+
+/* Summary tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;transition:border-color .15s}
+.tile:hover{border-color:var(--accent)}
+.tile.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tile .n{font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.tile .l{font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:2px;flex:none}
+.sw.white{background:var(--tag-white-fill);box-shadow:inset 0 0 0 1px var(--line)}
+.sw.green{background:var(--tag-green)}
+.sw.red{background:var(--tag-red)}
+.sw.amber{background:var(--amber)}
+
+/* Toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.toolbar input[type=search]{flex:1 1 180px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
+.toolbar select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+.btn.danger{color:var(--tag-red)}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* Legend */
+.legend{font-size:13px;color:var(--muted);margin:0 0 18px;display:flex;flex-wrap:wrap;gap:4px 18px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+/* Forms */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px}
+.panel h2{font-family:var(--font-display);font-weight:600;font-size:22px;margin:0 0 12px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.panel label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.panel label.chk{flex-direction:row;align-items:center;gap:8px}
+.panel input:not([type=checkbox]):not([type=radio]),.panel select,.panel textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:15px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--fg)}
+.panel textarea{resize:vertical;min-height:60px}
+.panel>label{margin-top:12px}
+.panel fieldset{border:0;padding:0;margin:14px 0 0}
+.panel legend{font-size:12.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:0;margin-bottom:6px}
+.radio-row{display:flex;flex-wrap:wrap;gap:8px}
+.radio-row label{display:flex;flex-direction:row;align-items:center;gap:6px;border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer;background:var(--surface-2);text-transform:none;letter-spacing:0;font-weight:500;font-size:14px;color:var(--fg)}
+.radio-row input{accent-color:var(--accent)}
+.form-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center}
+.hint{font-size:13px;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none}
+
+/* Asset cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-left-width:4px;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card[data-tag=white]{border-left-color:var(--line)}
+.card[data-tag=green]{border-left-color:var(--tag-green)}
+.card[data-tag=red]{border-left-color:var(--tag-red)}
+.card[data-tag=amber]{border-left-color:var(--amber)}
+.card .cat{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.card h3{font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.15;margin:1px 0 0;overflow-wrap:anywhere}
+.card .meta{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.card .notes{font-size:13.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.statusline{font-size:12.5px;color:var(--muted)}
+.statusline b{color:var(--fg);font-weight:600}
+
+/* Physical condition tags */
+.tagrow{display:flex;gap:6px;flex-wrap:wrap}
+.tag{position:relative;border-radius:3px 6px 6px 3px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);font-size:12.5px;font-weight:600;letter-spacing:.04em;padding:6px 10px 6px 22px;cursor:pointer;transition:opacity .15s}
+.tag::before{content:"";position:absolute;left:8px;top:50%;transform:translateY(-50%);width:7px;height:7px;border-radius:50%;background:var(--bg);box-shadow:inset 0 0 0 1.5px currentColor;opacity:.75}
+.tag:not(.cur):hover{border-color:var(--accent);color:var(--fg)}
+.tag.cur{cursor:default}
+.tag.cur.white{background:var(--tag-white-fill);color:var(--tag-white-ink);border-color:var(--muted);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tag.cur.green{background:var(--tag-green);border-color:var(--tag-green);color:#fff}
+.tag.cur.red{background:var(--tag-red);border-color:var(--tag-red);color:#fff}
+.tag:disabled{cursor:default;opacity:.55}
+.card .actions{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
+.card .actions .btn{padding:5px 11px;font-size:13px}
+
+/* Flight rows & report cards */
+.rows{display:flex;flex-direction:column;gap:10px}
+.row-head{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.row-head .when{font-family:var(--font-mono);font-size:12.5px;color:var(--muted)}
+.row-head h3{font-family:var(--font-display);font-weight:600;font-size:20px;margin:0}
+.dur{font-family:var(--font-display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums;margin-left:auto}
+.dur small{font-size:13px;font-weight:600;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:3px 10px;color:var(--muted)}
+.chip b{color:var(--fg);font-weight:600}
+.flags{display:flex;flex-direction:column;gap:4px}
+.flag{font-size:13px;font-weight:600;border-radius:6px;padding:4px 10px;width:fit-content;max-width:100%}
+.flag.red{background:var(--tag-red-soft);color:var(--tag-red)}
+.flag.amber{background:var(--amber-soft);color:var(--amber)}
+.flag.ok{background:var(--tag-green-soft);color:var(--tag-green);font-weight:500}
+.pill{font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;border-radius:999px;padding:3px 10px;border:1px solid var(--line);color:var(--muted)}
+.pill.open{background:var(--amber-soft);color:var(--amber);border-color:transparent}
+.pill.closed{background:var(--tag-green-soft);color:var(--tag-green);border-color:transparent}
+.pill.sev-high{background:var(--tag-red-soft);color:var(--tag-red);border-color:transparent}
+.pill.active{background:var(--tag-green-soft);color:var(--tag-green);border-color:transparent}
+
+/* Evidence gallery */
+.gallery{display:flex;flex-wrap:wrap;gap:8px}
+.gallery img,.gallery video{max-height:150px;max-width:100%;border-radius:6px;border:1px solid var(--line);background:var(--surface-2)}
+.gallery img{cursor:zoom-in}
+.gallery img.zoom{max-height:none;cursor:zoom-out}
+.ev-edit{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ev-item{position:relative}
+.ev-item .btn{position:absolute;top:4px;right:4px;padding:1px 8px;font-size:12px}
+.ev-item img,.ev-item video{max-height:90px;border-radius:6px;border:1px solid var(--line)}
+
+/* Summary bar */
+.sumbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.sumbar:empty{display:none}
+.sumitem{font-size:13px;font-weight:600;border:0;border-radius:6px;padding:6px 12px;cursor:pointer;text-align:left}
+.sumitem.red{background:var(--tag-red-soft);color:var(--tag-red)}
+.sumitem.amber{background:var(--amber-soft);color:var(--amber)}
+.sumitem:hover{text-decoration:underline}
+
+/* Crew, checklist & approval */
+.crew-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.crew-row input[type=text]{flex:1 1 150px;min-width:0}
+.crew-row label{flex-direction:row;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-weight:500;font-size:14px;color:var(--fg)}
+.crew-row .btn{padding:4px 10px;font-size:13px}
+.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px 16px}
+.check-grid label{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-weight:500;font-size:14px;color:var(--fg)}
+input[type=checkbox]{accent-color:var(--accent)}
+.approve{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.approve input{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:7px 10px;flex:1 1 160px;min-width:0;max-width:260px}
+.btn.go{background:var(--tag-green);border-color:var(--tag-green);color:#fff;font-weight:700;letter-spacing:.05em}
+.btn.nogo{background:var(--tag-red);border-color:var(--tag-red);color:#fff;font-weight:700;letter-spacing:.05em}
+.decision{font-family:var(--font-display);font-size:17px;letter-spacing:.06em}
+a.chip{text-decoration:none}
+.docbadge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:10px 14px;text-decoration:none;color:var(--fg);font-weight:600;max-width:100%;overflow-wrap:anywhere}
+.docbadge:hover{border-color:var(--accent)}
+.docbadge .ext{background:var(--tag-red);color:#fff;font-size:11px;border-radius:4px;padding:2px 6px;font-weight:700;letter-spacing:.05em;flex:none}
+.sign-chk{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--fg);flex:1 1 260px;min-width:0}
+.prog{font-size:12.5px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Import panel */
+.map-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
+.mono{font-family:var(--font-mono)}
+
+/* Notices / empty state */
+#notice{display:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;color:var(--muted)}
+#notice.show{display:block}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:34px 24px;text-align:center}
+.empty h2{font-family:var(--font-display);font-weight:600;font-size:24px;margin:0 0 6px}
+.empty p{color:var(--muted);max-width:50ch;margin:0 auto}
+.empty .tags-demo{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);border-radius:8px;padding:9px 16px;font-size:13.5px;max-width:90vw;z-index:20}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Fleet &amp; asset readiness</div>
+      <h1>Fleet Asset Register</h1>
+      <p class="sub">Asset register with condition tags, post-flight logging checked against day-by-day permissions, and incident / near-miss / defect reporting with photo and video evidence.</p>
+    </div>
+    <span class="ro-pill" id="ro-pill" hidden>Read-only view</span>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab" data-view="assets" type="button">Assets</button>
+    <button class="tab" data-view="missions" type="button">Missions <span class="count" id="tab-mission" hidden></span></button>
+    <button class="tab" data-view="flights" type="button">Flight log <span class="count" id="tab-flag" hidden></span></button>
+    <button class="tab" data-view="checkout" type="button">Checkout <span class="count" id="tab-out" hidden></span></button>
+    <button class="tab" data-view="people" type="button">People <span class="count" id="tab-cert" hidden></span></button>
+    <button class="tab" data-view="sops" type="button">SOPs <span class="count" id="tab-sop" hidden></span></button>
+    <button class="tab" data-view="reports" type="button">Reports <span class="count" id="tab-open" hidden></span></button>
+    <button class="tab" data-view="permits" type="button">Permissions <span class="count" id="tab-permit" hidden></span></button>
+  </nav>
+
+  <div id="notice" role="status"></div>
+
+  <div class="sumbar" id="summary"></div>
+
+  <!-- ============ ASSETS ============ -->
+  <section id="view-assets" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search name, model, serial…" aria-label="Search assets">
+      <select id="cat-filter" aria-label="Filter by category"><option value="">All categories</option></select>
+      <button class="btn primary" id="btn-register" type="button">+ Register asset</button>
+    </div>
+    <p class="legend">
+      <span><span class="sw white"></span><b>White tag</b>&nbsp;— airworthy, released to service</span>
+      <span><span class="sw green"></span><b>Green tag</b>&nbsp;— maintenance / inspection</span>
+      <span><span class="sw red"></span><b>Red tag</b>&nbsp;— not airworthy, do not fly</span>
+    </p>
+    <form id="asset-form" class="panel" hidden>
+      <h2 id="form-title">Register asset</h2>
+      <div class="fgrid">
+        <label>Designation / name *<input id="f-name" required maxlength="100" placeholder="e.g. Matrice 4TD — DFR 1"></label>
+        <label>Category *<select id="f-cat"></select></label>
+        <label>Make / model<input id="f-model" maxlength="100" placeholder="e.g. DJI Matrice 4TD"></label>
+        <label>Serial no.<input id="f-serial" maxlength="80"></label>
+        <label>Firmware<input id="f-fw" maxlength="60" placeholder="e.g. v10.1.0.03"></label>
+        <label>Location / kit<input id="f-loc" maxlength="100" placeholder="e.g. Dock site A, flight case 2"></label>
+      </div>
+      <fieldset>
+        <legend>Condition tag</legend>
+        <div class="radio-row">
+          <label><input type="radio" name="f-tag" id="f-tag-white" value="white" checked> White — airworthy</label>
+          <label><input type="radio" name="f-tag" id="f-tag-green" value="green"> Green — maintenance</label>
+          <label><input type="radio" name="f-tag" id="f-tag-red" value="red"> Red — not airworthy</label>
+        </div>
+      </fieldset>
+      <label>Status note<input id="f-tagnote" maxlength="200" placeholder="Why this tag? e.g. 90-day inspection due"></label>
+      <label>Notes<textarea id="f-notes" maxlength="1000"></textarea></label>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="btn-save">Save asset</button>
+        <button class="btn" type="button" id="btn-cancel">Cancel</button>
+      </div>
+    </form>
+    <div class="grid" id="grid"></div>
+    <div id="empty-slot"></div>
+  </section>
+
+  <!-- ============ MISSIONS ============ -->
+  <section id="view-missions" hidden>
+    <div class="tiles" id="ms-tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="ms-q" placeholder="Search mission, aircraft, crew…" aria-label="Search missions">
+      <button class="btn primary" id="btn-newmission" type="button">+ Plan mission</button>
+    </div>
+    <form id="mission-form" class="panel" hidden>
+      <h2 id="ms-form-title">Mission plan</h2>
+      <div class="fgrid">
+        <label>Mission name *<input id="ms-name" required maxlength="120" placeholder="e.g. Zone B morning patrol"></label>
+        <label>Date *<input type="date" id="ms-date" required></label>
+        <label>Planned start<input type="time" id="ms-start"></label>
+        <label>Project / permission<select id="ms-permit"></select></label>
+        <label>Aircraft *<select id="ms-aircraft" required></select></label>
+        <label>Battery<select id="ms-battery"></select></label>
+        <label>Payload / sensor<select id="ms-payload"></select></label>
+      </div>
+      <label>Objective / tasking<textarea id="ms-objective" maxlength="1000"></textarea></label>
+
+      <fieldset><legend>Weather check</legend>
+        <div class="fgrid">
+          <label>Wind (m/s)<input type="number" id="ms-wind" min="0" max="60" step="0.1"></label>
+          <label>Gusts (m/s)<input type="number" id="ms-gust" min="0" max="80" step="0.1"></label>
+          <label>Visibility (km)<input type="number" id="ms-vis" min="0" max="100" step="0.1"></label>
+          <label>Temperature (°C)<input type="number" id="ms-temp" min="-30" max="60" step="0.1"></label>
+        </div>
+        <label>Conditions / source<input id="ms-wx" maxlength="200" placeholder="e.g. TAF VTCC 08006KT 9999 FEW020 — checked 06:30"></label>
+      </fieldset>
+
+      <fieldset><legend>NOTAMs</legend>
+        <label>NOTAM summary<textarea id="ms-notamtext" maxlength="2000" placeholder="Paste or summarise applicable NOTAMs"></textarea></label>
+        <label id="ms-notam-label">NOTAM files<input type="file" id="ms-notamfiles" accept=".pdf,application/pdf,image/*,.txt" multiple></label>
+        <div class="ev-edit" id="ms-notam-ev"></div>
+      </fieldset>
+
+      <fieldset><legend>Crew &amp; currency</legend>
+        <div id="ms-crew"></div>
+        <div class="form-actions" style="margin-top:8px"><button class="btn" type="button" id="ms-addcrew">+ Add crew member</button></div>
+      </fieldset>
+
+      <fieldset><legend>Site survey</legend>
+        <label id="ms-survey-label">Survey documents (PDF)<input type="file" id="ms-surveyfiles" accept=".pdf,application/pdf" multiple></label>
+        <div class="ev-edit" id="ms-survey-ev"></div>
+      </fieldset>
+
+      <fieldset><legend>Go / no-go checklist</legend>
+        <div class="check-grid" id="ms-checks"></div>
+      </fieldset>
+
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="ms-save">Save mission plan</button>
+        <button class="btn" type="button" id="ms-cancel">Cancel</button>
+      </div>
+    </form>
+    <div class="rows" id="ms-rows"></div>
+    <div id="ms-empty"></div>
+  </section>
+
+  <!-- ============ FLIGHT LOG ============ -->
+  <section id="view-flights" hidden>
+    <div class="tiles" id="fl-tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="fl-q" placeholder="Search pilot, aircraft, project, notes…" aria-label="Search flights">
+      <button class="btn" id="btn-import" type="button">Import CSV</button>
+      <button class="btn primary" id="btn-logflight" type="button">+ Log flight</button>
+    </div>
+
+    <form id="flight-form" class="panel" hidden>
+      <h2 id="fl-form-title">Post-flight report</h2>
+      <div class="fgrid">
+        <label>Date *<input type="date" id="fl-date" required></label>
+        <label>Start time *<input type="time" id="fl-start" required></label>
+        <label>End time *<input type="time" id="fl-end" required></label>
+        <label>Pilot in command *<input id="fl-pilot" required maxlength="80" list="pilot-list"><datalist id="pilot-list"></datalist></label>
+        <label>Project / permission<select id="fl-permit"></select></label>
+        <label>Aircraft *<select id="fl-aircraft" required></select></label>
+        <label>Battery<select id="fl-battery"></select></label>
+        <label>Payload<select id="fl-payload"></select></label>
+        <label>RC / controller<select id="fl-rc"></select></label>
+        <label>Flight type<select id="fl-type">
+          <option value="routine">Routine ops</option><option value="training">Training</option>
+          <option value="demo">Demonstration</option><option value="deployment">Field deployment</option>
+          <option value="emergency">Emergency response</option><option value="test">Test / maintenance check</option>
+        </select></label>
+        <label>Max altitude AGL (m)<input type="number" id="fl-alt" min="0" max="10000" step="1"></label>
+        <label>Max distance (m)<input type="number" id="fl-dist" min="0" max="100000" step="1"></label>
+      </div>
+      <fieldset><legend>Conditions</legend>
+        <div class="radio-row"><label class="chk"><input type="checkbox" id="fl-night"> Night flight</label></div>
+      </fieldset>
+      <label>Notes / remarks<textarea id="fl-notes" maxlength="1000"></textarea></label>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="fl-save">Save flight</button>
+        <button class="btn" type="button" id="fl-cancel">Cancel</button>
+        <span class="hint" id="fl-durhint"></span>
+      </div>
+    </form>
+
+    <form id="import-panel" class="panel" hidden>
+      <h2>Import flight records (CSV)</h2>
+      <p class="hint" style="margin:0 0 10px">Export flight records from DJI FlightHub 2 (or AirData) as CSV, then map the columns below. Imported flights are checked against the linked permission like any other entry.</p>
+      <input type="file" id="csv-file" accept=".csv,text/csv">
+      <div id="csv-map" hidden>
+        <div class="map-grid" id="map-grid"></div>
+        <div class="form-actions">
+          <button class="btn primary" type="submit" id="csv-go">Import</button>
+          <button class="btn" type="button" id="csv-cancel">Cancel</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="rows" id="fl-rows"></div>
+    <div id="fl-empty"></div>
+  </section>
+
+  <!-- ============ CHECKOUT ============ -->
+  <section id="view-checkout" hidden>
+    <div class="tiles" id="co-tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="co-q" placeholder="Search asset, person, purpose…" aria-label="Search check-outs">
+      <button class="btn primary" id="btn-checkout" type="button">+ Check out</button>
+    </div>
+    <form id="checkout-form" class="panel" hidden>
+      <h2>Check out equipment</h2>
+      <div class="fgrid">
+        <label>Asset *<select id="co-asset" required></select></label>
+        <label>Checked out to *<input id="co-who" required maxlength="80" list="co-list"><datalist id="co-list"></datalist></label>
+        <label>Date out *<input type="date" id="co-date" required></label>
+        <label>Expected return<input type="date" id="co-due"></label>
+      </div>
+      <label>Purpose / mission<input id="co-purpose" maxlength="200" placeholder="e.g. Zone B deployment, training day"></label>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="co-save">Check out</button>
+        <button class="btn" type="button" id="co-cancel">Cancel</button>
+      </div>
+    </form>
+    <div class="rows" id="co-rows"></div>
+    <div id="co-empty"></div>
+  </section>
+
+  <!-- ============ PEOPLE ============ -->
+  <section id="view-people" hidden>
+    <div class="tiles" id="pp-tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="pp-q" placeholder="Search name, role, cert no…" aria-label="Search pilots">
+      <button class="btn primary" id="btn-newpilot" type="button">+ Add pilot</button>
+    </div>
+    <form id="pilot-form" class="panel" hidden>
+      <h2 id="pp-form-title">Add pilot</h2>
+      <div class="fgrid">
+        <label>Name *<input id="pp-name" required maxlength="100"></label>
+        <label>Role<input id="pp-role" maxlength="100" placeholder="e.g. PIC / instructor / observer"></label>
+      </div>
+      <fieldset><legend>CAAT pilot certificate</legend>
+        <label id="pp-cert-label">Certificate photo or PDF<input type="file" id="pp-certfile" accept="image/*,.pdf,application/pdf"></label>
+        <div class="form-actions" style="margin-top:8px">
+          <button class="btn" type="button" id="pp-read" hidden>Read details from the photo</button>
+          <span class="hint" id="pp-read-status"></span>
+        </div>
+        <div class="fgrid" style="margin-top:12px">
+          <label>Certificate no.<input id="pp-certno" maxlength="60"></label>
+          <label>Certificate type<input id="pp-certtype" maxlength="120" placeholder="e.g. UAV ≤ 25 kg"></label>
+          <label>Date of issue<input type="date" id="pp-issue"></label>
+          <label>Date of expiry<input type="date" id="pp-expiry"></label>
+        </div>
+        <div class="ev-edit" id="pp-cert-ev"></div>
+      </fieldset>
+      <fieldset><legend>Other documents</legend>
+        <label id="pp-docs-label">Files (medical, training records, NBTC licence…)<input type="file" id="pp-docs" accept="image/*,.pdf,application/pdf" multiple></label>
+        <div class="ev-edit" id="pp-docs-ev"></div>
+      </fieldset>
+      <label>Notes<textarea id="pp-notes" maxlength="1000"></textarea></label>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="pp-save">Save pilot</button>
+        <button class="btn" type="button" id="pp-cancel">Cancel</button>
+      </div>
+    </form>
+    <div class="rows" id="pp-rows"></div>
+    <div id="pp-empty"></div>
+  </section>
+
+  <!-- ============ SOPS ============ -->
+  <section id="view-sops" hidden>
+    <div class="tiles" id="so-tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="so-q" placeholder="Search procedures…" aria-label="Search SOPs">
+      <select id="so-cat" aria-label="Filter by type">
+        <option value="">All types</option>
+        <option value="sop">SOP</option>
+        <option value="emergency">Emergency procedure</option>
+        <option value="checklist">Checklist</option>
+      </select>
+      <button class="btn primary" id="btn-newsop" type="button">+ Add procedure</button>
+    </div>
+    <form id="sop-form" class="panel" hidden>
+      <h2 id="so-form-title">Add procedure</h2>
+      <div class="fgrid">
+        <label>Title *<input id="so-title" required maxlength="140" placeholder="e.g. Lost-link / RTH procedure"></label>
+        <label>Type *<select id="so-type">
+          <option value="sop">SOP</option>
+          <option value="emergency">Emergency procedure</option>
+          <option value="checklist">Checklist</option>
+        </select></label>
+        <label>Revision<input id="so-rev" maxlength="20" placeholder="e.g. v1"></label>
+        <label>Effective date<input type="date" id="so-date"></label>
+      </div>
+      <label>Summary / key steps<textarea id="so-notes" maxlength="4000"></textarea></label>
+      <label id="so-files-label">Document files (PDF or photos)<input type="file" id="so-files" accept="image/*,.pdf,application/pdf,.txt" multiple></label>
+      <div class="ev-edit" id="so-ev"></div>
+      <p class="hint" id="so-rev-hint" hidden></p>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="so-save">Save procedure</button>
+        <button class="btn" type="button" id="so-cancel">Cancel</button>
+      </div>
+    </form>
+    <datalist id="roster-list"></datalist>
+    <div class="rows" id="so-rows"></div>
+    <div id="so-empty"></div>
+  </section>
+
+  <!-- ============ REPORTS ============ -->
+  <section id="view-reports" hidden>
+    <div class="tiles" id="rp-tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="rp-q" placeholder="Search reports…" aria-label="Search reports">
+      <button class="btn primary" id="btn-newreport" type="button">+ New report</button>
+    </div>
+    <form id="report-form" class="panel" hidden>
+      <h2 id="rp-form-title">New report</h2>
+      <div class="fgrid">
+        <label>Type *<select id="rp-type">
+          <option value="incident">Incident</option><option value="near-miss">Near miss</option>
+          <option value="defect">Defect</option><option value="observation">Safety observation</option>
+        </select></label>
+        <label>Date *<input type="date" id="rp-date" required></label>
+        <label>Severity<select id="rp-sev">
+          <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+        </select></label>
+        <label>Related asset<select id="rp-asset"></select></label>
+      </div>
+      <label>Title *<input id="rp-title" required maxlength="120" placeholder="Short summary, e.g. Lost-link event over zone B"></label>
+      <label>Description<textarea id="rp-desc" maxlength="2000" placeholder="What happened, conditions, contributing factors"></textarea></label>
+      <label>Corrective action<textarea id="rp-action" maxlength="2000" placeholder="Immediate action taken and follow-up required"></textarea></label>
+      <label id="rp-files-label">Photo / video evidence
+        <input type="file" id="rp-files" accept="image/*,video/*" multiple>
+        <span class="hint">Images or video clips, up to 20 MB per file.</span>
+      </label>
+      <div class="ev-edit" id="rp-ev"></div>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="rp-save">Save report</button>
+        <button class="btn" type="button" id="rp-cancel">Cancel</button>
+      </div>
+    </form>
+    <div class="rows" id="rp-rows"></div>
+    <div id="rp-empty"></div>
+  </section>
+
+  <!-- ============ PERMISSIONS LOG ============ -->
+  <section id="view-permits" hidden>
+    <div class="tiles" id="pm-tiles"></div>
+    <div class="toolbar">
+      <input type="search" id="pm-q" placeholder="Search project, reference…" aria-label="Search permissions">
+      <button class="btn primary" id="btn-newpermit" type="button">+ Log permission</button>
+    </div>
+    <p class="legend"><span>Log each day's or project's operating permission here. Every flight links to one and is flagged if it exceeds its limits, falls outside its dates, or has no permission at all.</span></p>
+    <form id="permit-form" class="panel" hidden>
+      <h2 id="pm-form-title">Log permission</h2>
+      <div class="fgrid">
+        <label>Project / mission *<input id="pm-project" required maxlength="120" placeholder="e.g. Dock patrol — Site A"></label>
+        <label>Valid from *<input type="date" id="pm-from" required></label>
+        <label>Valid to<input type="date" id="pm-to"></label>
+        <label>Max altitude AGL (m)<input type="number" id="pm-alt" min="0" max="10000" step="1" placeholder="e.g. 90"></label>
+        <label>Max distance (m)<input type="number" id="pm-dist" min="0" max="100000" step="1" placeholder="e.g. 500"></label>
+        <label>Area / location<input id="pm-area" maxlength="150" placeholder="e.g. Zone B, Mae Rim district"></label>
+      </div>
+      <fieldset><legend>Conditions</legend>
+        <div class="radio-row"><label class="chk"><input type="checkbox" id="pm-day" checked> Daylight operations only (flag night flights)</label></div>
+      </fieldset>
+      <label>Permission reference<input id="pm-ref" maxlength="200" placeholder="e.g. CAAT approval no. / NBTC licence / landowner permission"></label>
+      <label>Conditions &amp; notes<textarea id="pm-notes" maxlength="2000" placeholder="Time windows, insurance, special conditions attached to the permission"></textarea></label>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="pm-save">Save permission</button>
+        <button class="btn" type="button" id="pm-cancel">Cancel</button>
+      </div>
+    </form>
+    <div class="rows" id="pm-rows"></div>
+    <div id="pm-empty"></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+const CATS = [
+  ["aircraft","Aircraft"],["battery","Battery"],["payload","Payload"],
+  ["controller","Controller / GCS"],["dock","Dock"],["comms","Comms / radio"],["spare","Spares / other"]
+];
+const CAT_LABEL = Object.fromEntries(CATS);
+const CAT_RANK = Object.fromEntries(CATS.map((c,i)=>[c[0],i]));
+const TAGS = {
+  white:{label:"White tag", short:"White", desc:"Airworthy"},
+  green:{label:"Green tag", short:"Green", desc:"Maintenance"},
+  red:{label:"Red tag", short:"Red", desc:"Not airworthy"}
+};
+const FTYPE = {routine:"Routine ops",training:"Training",demo:"Demonstration",deployment:"Field deployment",emergency:"Emergency response",test:"Test / check"};
+const RTYPE = {"incident":"Incident","near-miss":"Near miss","defect":"Defect","observation":"Observation"};
+const VIEWS = ["assets","missions","flights","checkout","people","sops","reports","permits"];
+
+let db=null, user=null, uid=null, assetsNs=null, sampleNs=null, sampleImgOk=false, canWrite=true, writeKnown=false, isAdmin=false;
+let assets=[], flights=[], reports=[], permits=[], missions=[], loans=[], pilots=[], sops=[], sopAcks=[];
+let loaded=false, flLoaded=false, rpLoaded=false, pmLoaded=false, msLoaded=false, coLoaded=false, ppLoaded=false, soLoaded=false;
+const state={
+  tag:null, cat:"", q:"", editing:null, confirmRm:null,
+  flQ:"", flFlagged:false, flEditing:null,
+  rpQ:"", rpType:null, rpOpen:false, rpEditing:null,
+  pmQ:"", pmEditing:null,
+  msQ:"", msDecision:null, msEditing:null,
+  coQ:"", ciId:null,
+  ppQ:"", ppFilter:null, ppEditing:null,
+  soQ:"", soCat:"", soPending:false, soEditing:null, soHist:{}
+};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate=iso=>{try{const d=new Date(String(iso).length===10?iso+"T00:00":iso);return d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})}catch(e){return String(iso)}};
+const today=()=>new Date().toISOString().slice(0,10);
+const toMin=t=>{const p=String(t||"").split(":");return p.length>=2?(+p[0])*60+(+p[1]):null;};
+function num(v){const n=parseFloat(v);return isFinite(n)?n:null;}
+
+/* ---------- static controls ---------- */
+const catSel=$("#f-cat"), catFilter=$("#cat-filter");
+for(const [v,l] of CATS){
+  catSel.insertAdjacentHTML("beforeend",`<option value="${v}">${l}</option>`);
+  catFilter.insertAdjacentHTML("beforeend",`<option value="${v}">${l}</option>`);
+}
+$("#q").addEventListener("input",e=>{state.q=e.target.value.trim().toLowerCase();renderAssets();});
+catFilter.addEventListener("change",e=>{state.cat=e.target.value;renderAssets();});
+$("#btn-register").addEventListener("click",()=>openForm(null));
+$("#btn-cancel").addEventListener("click",closeForm);
+$("#asset-form").addEventListener("submit",saveAsset);
+$("#fl-q").addEventListener("input",e=>{state.flQ=e.target.value.trim().toLowerCase();renderFlights();});
+$("#btn-logflight").addEventListener("click",()=>openFlightForm(null));
+$("#fl-cancel").addEventListener("click",closeFlightForm);
+$("#flight-form").addEventListener("submit",saveFlight);
+for(const id of ["fl-start","fl-end"])$("#"+id).addEventListener("input",updateDurHint);
+$("#btn-import").addEventListener("click",()=>{$("#import-panel").hidden=false;$("#flight-form").hidden=true;});
+$("#csv-cancel").addEventListener("click",resetImport);
+$("#csv-file").addEventListener("change",onCsvFile);
+$("#import-panel").addEventListener("submit",runImport);
+$("#rp-q").addEventListener("input",e=>{state.rpQ=e.target.value.trim().toLowerCase();renderReports();});
+$("#btn-newreport").addEventListener("click",()=>openReportForm(null));
+$("#rp-cancel").addEventListener("click",closeReportForm);
+$("#report-form").addEventListener("submit",saveReport);
+$("#pm-q").addEventListener("input",e=>{state.pmQ=e.target.value.trim().toLowerCase();renderPermits();});
+$("#btn-newpermit").addEventListener("click",()=>openPermitForm(null));
+$("#pm-cancel").addEventListener("click",closePermitForm);
+$("#permit-form").addEventListener("submit",savePermit);
+
+/* ---------- tabs / hash routing ---------- */
+function showView(){
+  let v=(location.hash||"").replace("#","");
+  if(!VIEWS.includes(v))v="assets";
+  for(const w of VIEWS)$("#view-"+w).hidden=(w!==v);
+  for(const b of document.querySelectorAll(".tab"))b.classList.toggle("on",b.dataset.view===v);
+  renderSummary();
+}
+$("#tabs").addEventListener("click",e=>{
+  const b=e.target.closest(".tab"); if(!b)return;
+  location.hash=b.dataset.view; showView();
+});
+window.addEventListener("hashchange",showView);
+showView();
+
+function notice(msg){const n=$("#notice");if(!msg){n.classList.remove("show");n.textContent="";}else{n.textContent=msg;n.classList.add("show");}}
+let toastTimer=null;
+function toast(msg){
+  let t=$("#toast"); if(!t){t=document.createElement("div");t.id="toast";document.body.appendChild(t);}
+  t.textContent=msg; clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.remove(),4500);
+}
+
+/* ---------- boot ---------- */
+renderAll();
+(async()=>{
+  const [d,u,a,s]=await Promise.all([claude.use("db"),claude.use("user"),claude.use("assets"),claude.use("sample")]);
+  db=d; user=u; assetsNs=a; sampleNs=s;
+  if(sampleNs){try{const lim=await sampleNs.limits();sampleImgOk=!!lim.images;}catch(err){sampleImgOk=false;}}
+  if(!assetsNs)for(const id of ["rp-files-label","ms-notam-label","ms-survey-label","pp-cert-label","pp-docs-label","so-files-label"]){const el=document.getElementById(id);if(el)el.hidden=true;}
+  if(user){
+    uid=await user.id();
+    isAdmin=await user.canEdit();
+    const w=await user.can("data.write");
+    if(w===false){canWrite=false;writeKnown=true;applyGate();}
+    else if(w===true){writeKnown=true;}
+  }
+  if(!db){
+    loaded=flLoaded=rpLoaded=pmLoaded=msLoaded=coLoaded=ppLoaded=soLoaded=true;
+    notice("The shared register could not be loaded for this view. Sign in on claude.ai to see and edit live data.");
+    renderAll(); return;
+  }
+  const timer=setTimeout(()=>notice("Still connecting to the shared register… data shown may be incomplete."),10000);
+  let settled=0; const settle=()=>{if(++settled>=2){clearTimeout(timer);notice(null);}};
+  db.collection("assets").onSnapshot(snap=>{
+    if(!snap.metadata.fromCache)settle();
+    assets=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    loaded=true; renderAll();
+  },err=>{clearTimeout(timer);loaded=true;notice("The shared register can't be reached right now ("+err.code+"). Changes are disabled.");renderAll();});
+  db.collection("flights").onSnapshot(snap=>{
+    if(!snap.metadata.fromCache)settle();
+    flights=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    flLoaded=true; renderFlights(); renderSummary();
+  },err=>{flLoaded=true;renderFlights();});
+  db.collection("reports").onSnapshot(snap=>{
+    reports=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    rpLoaded=true; renderReports(); renderSummary();
+  },err=>{rpLoaded=true;renderReports();});
+  db.collection("permits").onSnapshot(snap=>{
+    permits=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    pmLoaded=true; renderPermits(); renderFlights(); renderMissions(); renderSummary();
+  },err=>{pmLoaded=true;renderPermits();});
+  db.collection("missions").onSnapshot(snap=>{
+    missions=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    msLoaded=true; renderMissions(); renderSummary();
+  },err=>{msLoaded=true;renderMissions();});
+  db.collection("loans").onSnapshot(snap=>{
+    loans=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    coLoaded=true; renderCheckout(); renderAssets(); renderSummary();
+  },err=>{coLoaded=true;renderCheckout();});
+  db.collection("pilots").onSnapshot(snap=>{
+    pilots=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    ppLoaded=true; renderPilots(); renderSops(); renderSummary();
+  },err=>{ppLoaded=true;renderPilots();});
+  db.collection("sops").onSnapshot(snap=>{
+    sops=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    soLoaded=true; renderSops(); renderSummary();
+  },err=>{soLoaded=true;renderSops();});
+  db.collection("sopacks").onSnapshot(snap=>{
+    sopAcks=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
+    renderSops(); renderSummary();
+  },err=>{});
+})();
+
+function applyGate(){
+  for(const id of ["btn-register","btn-logflight","btn-import","btn-newreport","btn-newpermit","btn-newmission","btn-checkout","btn-newpilot","btn-newsop"])$("#"+id).hidden=!canWrite;
+  $("#ro-pill").hidden=canWrite;
+  if(!canWrite){closeForm();closeFlightForm();closeReportForm();closePermitForm();closeMissionForm();closeCheckoutForm();closePilotForm();closeSopForm();resetImport();}
+}
+function demoteToReadOnly(){
+  canWrite=false; writeKnown=true; applyGate(); renderAll();
+  toast("You have view-only access to this register.");
+}
+function writeErr(err,what){
+  if(err&&err.code==="invalid_argument"&&!writeKnown)demoteToReadOnly();
+  else toast("Couldn't "+what+": "+(err&&err.message||"unknown error"));
+}
+function renderAll(){renderAssets();renderFlights();renderReports();renderPermits();renderMissions();renderCheckout();renderPilots();renderSops();renderSummary();}
+function renderSummary(){
+  const el=document.getElementById("summary");
+  if(!el)return;
+  if(!loaded){el.innerHTML="";return;}
+  const items=[];
+  const add=(view,lvl,text)=>items.push({view,lvl,text});
+  const redA=assets.filter(a=>a.tag==="red").length, grnA=assets.filter(a=>a.tag==="green").length;
+  if(redA)add("assets","red",`${redA} asset${redA===1?"":"s"} not airworthy`);
+  if(grnA)add("assets","amber",`${grnA} asset${grnA===1?"":"s"} in maintenance`);
+  const pendMs=missions.filter(m=>(m.decision||"pending")==="pending").length;
+  if(pendMs)add("missions","amber",`${pendMs} mission${pendMs===1?"":"s"} awaiting go/no-go`);
+  const flRed=flights.filter(f=>flightFlags(f).some(x=>x.lvl==="red")).length;
+  const flAmb=flights.filter(f=>{const fl=flightFlags(f);return fl.length&&!fl.some(x=>x.lvl==="red");}).length;
+  if(flRed)add("flights","red",`${flRed} flight${flRed===1?"":"s"} outside permission`);
+  if(flAmb)add("flights","amber",`${flAmb} flight${flAmb===1?"":"s"} with warnings`);
+  const out=loans.filter(l=>l.status==="out");
+  const over=out.filter(l=>l.due&&l.due<today()).length;
+  if(over)add("checkout","red",`${over} overdue return${over===1?"":"s"}`);
+  else if(out.length)add("checkout","amber",`${out.length} item${out.length===1?"":"s"} checked out`);
+  const exp=pilots.filter(p=>certStatus(p)==="expired").length;
+  const soon=pilots.filter(p=>certStatus(p)==="soon").length;
+  if(exp)add("people","red",`${exp} pilot cert${exp===1?"":"s"} expired`);
+  if(soon)add("people","amber",`${soon} cert${soon===1?"":"s"} expiring ≤ 30 days`);
+  const soPend=sops.filter(s=>sopMissing(s).length>0);
+  if(soPend.length)add("sops",soPend.some(s=>s.category==="emergency")?"red":"amber",`${soPend.length} procedure${soPend.length===1?"":"s"} awaiting signatures`);
+  const openRp=reports.filter(r=>r.status==="open");
+  if(openRp.length)add("reports",openRp.some(r=>r.severity==="high")?"red":"amber",`${openRp.length} open report${openRp.length===1?"":"s"}`);
+  if(!permits.some(p=>permitCovers(p,today())))add("permits","amber","No permission active today");
+  let v=(location.hash||"").replace("#","");
+  if(!VIEWS.includes(v))v="assets";
+  const mine=items.filter(i=>i.view===v);
+  if(!mine.length){el.innerHTML=`<span class="flag ok">No flags on this page</span>`;return;}
+  mine.sort((a,b)=>(a.lvl==="red"?0:1)-(b.lvl==="red"?0:1));
+  el.innerHTML=mine.map(i=>`<span class="flag ${i.lvl}">⚑ ${esc(i.text)}</span>`).join("");
+}
+
+/* ================= ASSETS ================= */
+function openForm(asset){
+  state.editing=asset?asset.id:null;
+  $("#form-title").textContent=asset?"Edit asset":"Register asset";
+  $("#btn-save").textContent=asset?"Save changes":"Save asset";
+  $("#f-name").value=asset?.name||"";
+  $("#f-cat").value=asset?.category||"aircraft";
+  $("#f-model").value=asset?.model||"";
+  $("#f-serial").value=asset?.serial||"";
+  $("#f-fw").value=asset?.firmware||"";
+  $("#f-loc").value=asset?.location||"";
+  $("#f-tagnote").value=asset?.tagNote||"";
+  $("#f-notes").value=asset?.notes||"";
+  const tag=asset?.tag||"white";
+  for(const t of ["white","green","red"])$("#f-tag-"+t).checked=(t===tag);
+  $("#asset-form").hidden=false;
+  $("#f-name").focus();
+  $("#asset-form").scrollIntoView({block:"nearest"});
+}
+function closeForm(){state.editing=null;$("#asset-form").hidden=true;}
+
+async function saveAsset(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const now=new Date().toISOString();
+  const body={
+    name:$("#f-name").value.trim(),
+    category:$("#f-cat").value,
+    model:$("#f-model").value.trim(),
+    serial:$("#f-serial").value.trim(),
+    firmware:$("#f-fw").value.trim(),
+    location:$("#f-loc").value.trim(),
+    tag:(document.querySelector("input[name=f-tag]:checked")||{}).value||"white",
+    tagNote:$("#f-tagnote").value.trim(),
+    notes:$("#f-notes").value.trim(),
+    updatedAt:now, updatedBy:uid||null
+  };
+  if(!body.name){toast("A name is required.");return;}
+  $("#btn-save").disabled=true;
+  try{
+    if(state.editing){
+      const prev=assets.find(a=>a.id===state.editing)||{};
+      await db.doc("assets/"+state.editing).set({...body,createdAt:prev.createdAt||now,createdBy:prev.createdBy||null});
+    }else{
+      await db.collection("assets").add({...body,createdAt:now,createdBy:uid||null});
+    }
+    closeForm();
+  }catch(err){writeErr(err,"save");}
+  $("#btn-save").disabled=false;
+}
+async function setTag(id,tag){
+  const a=assets.find(x=>x.id===id);
+  if(!a||a.tag===tag||!db)return;
+  try{await db.doc("assets/"+id).update({tag,updatedAt:new Date().toISOString(),updatedBy:uid||null});}
+  catch(err){writeErr(err,"change the tag");}
+}
+async function removeDoc(coll,id,what){
+  if(!db)return;
+  try{await db.doc(coll+"/"+id).delete();}
+  catch(err){writeErr(err,"remove the "+what);}
+}
+$("#grid").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="tag")setTag(id,b.dataset.tag);
+  else if(b.dataset.act==="edit"){const a=assets.find(x=>x.id===id);if(a)openForm(a);}
+  else if(b.dataset.act==="rm")confirmRemove("assets",id,"asset",renderAssets);
+});
+function confirmRemove(coll,id,what,rerender,onConfirm){
+  const key=coll+":"+id;
+  if(state.confirmRm===key){state.confirmRm=null;onConfirm?onConfirm():removeDoc(coll,id,what);}
+  else{state.confirmRm=key;rerender();setTimeout(()=>{if(state.confirmRm===key){state.confirmRm=null;rerender();}},5000);}
+}
+function counts(){
+  const c={white:0,green:0,red:0};
+  for(const a of assets)if(c[a.tag]!==undefined)c[a.tag]++;
+  return c;
+}
+function renderTiles(){
+  const c=counts();
+  const tile=(key,label,n,sw)=>`<button class="tile${state.tag===key?" on":""}" data-tag="${key??""}" type="button" aria-pressed="${state.tag===key}">
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#tiles").innerHTML=
+    tile("white","Airworthy",c.white,"white")+
+    tile("green","Maintenance",c.green,"green")+
+    tile("red","Not airworthy",c.red,"red")+
+    tile(null,"Total assets",assets.length,null);
+  for(const b of $("#tiles").querySelectorAll(".tile"))
+    b.addEventListener("click",()=>{const t=b.dataset.tag||null;state.tag=(state.tag===t)?null:t;renderAssets();});
+}
+function assetMatches(a){
+  if(state.tag&&a.tag!==state.tag)return false;
+  if(state.cat&&a.category!==state.cat)return false;
+  if(state.q){
+    const hay=[a.name,a.model,a.serial,a.location,a.notes].join(" ").toLowerCase();
+    if(!hay.includes(state.q))return false;
+  }
+  return true;
+}
+function renderAssets(){
+  renderTiles();
+  const grid=$("#grid"), slot=$("#empty-slot");
+  const list=assets.filter(assetMatches).sort((a,b)=>
+    (CAT_RANK[a.category]??9)-(CAT_RANK[b.category]??9)||String(a.name||"").localeCompare(String(b.name||"")));
+  if(!loaded){grid.innerHTML="";slot.innerHTML=`<div class="empty"><p>Loading the shared register…</p></div>`;return;}
+  if(assets.length===0){
+    grid.innerHTML="";
+    slot.innerHTML=`<div class="empty">
+      <h2>No assets registered yet</h2>
+      <p>${canWrite?"Use <b>Register asset</b> to add your first aircraft, battery, payload, controller or dock. Each asset carries a condition tag your whole team sees.":"Assets registered by the team will appear here with their condition tags."}</p>
+      <div class="tags-demo">
+        <span class="tag cur white">White — airworthy</span>
+        <span class="tag cur green">Green — maintenance</span>
+        <span class="tag cur red">Red — not airworthy</span>
+      </div></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No assets match the current filters.</p></div>`;
+  grid.innerHTML=list.map(a=>{
+    const meta=[a.model,a.serial?`SN ${a.serial}`:"",a.firmware?`FW ${a.firmware}`:""].filter(Boolean).join(" · ");
+    const tagBtns=["white","green","red"].map(t=>{
+      const cur=a.tag===t;
+      return `<button class="tag${cur?" cur "+t:""}" data-act="tag" data-id="${esc(a.id)}" data-tag="${t}"
+        ${(!canWrite||cur)?"disabled":""} aria-pressed="${cur}" title="${TAGS[t].desc}">${TAGS[t].short}</button>`;
+    }).join("");
+    const status=`<b>${TAGS[a.tag]?.label||"Untagged"}</b>${a.updatedAt?` · set ${fmtDate(a.updatedAt)}`:""}${a.tagNote?` — ${esc(a.tagNote)}`:""}`;
+    const loan=activeLoan(a.id);
+    return `<article class="card" data-tag="${esc(a.tag||"white")}">
+      <div>
+        <div class="cat">${esc(CAT_LABEL[a.category]||a.category||"")}</div>
+        <h3>${esc(a.name)}</h3>
+        ${meta?`<div class="meta">${esc(meta)}</div>`:""}
+        ${a.location?`<div class="meta">${esc(a.location)}</div>`:""}
+      </div>
+      <div class="tagrow">${tagBtns}</div>
+      <div class="statusline">${status}</div>
+      ${loan?`<div class="statusline">Checked out to <b>${esc(loan.outBy)}</b>${loan.due?` · due ${fmtDate(loan.due)}`:""}</div>`:""}
+      ${a.notes?`<p class="notes">${esc(a.notes)}</p>`:""}
+      ${canWrite?`<div class="actions">
+        <button class="btn" data-act="edit" data-id="${esc(a.id)}" type="button">Edit</button>
+        <button class="btn danger" data-act="rm" data-id="${esc(a.id)}" type="button">${state.confirmRm==="assets:"+a.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+
+/* ================= PERMITS ================= */
+function permitLabel(p){
+  const span=p.dateTo&&p.dateTo!==p.dateFrom?`${fmtDate(p.dateFrom)} – ${fmtDate(p.dateTo)}`:fmtDate(p.dateFrom);
+  return `${p.project} · ${span}`;
+}
+function permitCovers(p,date){
+  if(!p.dateFrom)return false;
+  const to=p.dateTo||p.dateFrom;
+  return date>=p.dateFrom&&date<=to;
+}
+function openPermitForm(p){
+  state.pmEditing=p?p.id:null;
+  $("#pm-form-title").textContent=p?"Edit permission":"Log permission";
+  $("#pm-save").textContent=p?"Save changes":"Save permission";
+  $("#pm-project").value=p?.project||"";
+  $("#pm-from").value=p?.dateFrom||today();
+  $("#pm-to").value=p?.dateTo||"";
+  $("#pm-alt").value=p?.maxAltM??"";
+  $("#pm-dist").value=p?.maxDistM??"";
+  $("#pm-area").value=p?.area||"";
+  $("#pm-day").checked=p?p.daylightOnly!==false:true;
+  $("#pm-ref").value=p?.reference||"";
+  $("#pm-notes").value=p?.notes||"";
+  $("#permit-form").hidden=false;
+  $("#pm-project").focus();
+  $("#permit-form").scrollIntoView({block:"nearest"});
+}
+function closePermitForm(){state.pmEditing=null;$("#permit-form").hidden=true;}
+
+async function savePermit(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const now=new Date().toISOString();
+  const from=$("#pm-from").value;
+  let to=$("#pm-to").value||from;
+  if(to<from){toast("'Valid to' can't be before 'Valid from'.");return;}
+  const body={
+    project:$("#pm-project").value.trim(),
+    dateFrom:from, dateTo:to,
+    maxAltM:num($("#pm-alt").value), maxDistM:num($("#pm-dist").value),
+    daylightOnly:$("#pm-day").checked,
+    area:$("#pm-area").value.trim(),
+    reference:$("#pm-ref").value.trim(), notes:$("#pm-notes").value.trim(),
+    updatedAt:now, updatedBy:uid||null
+  };
+  if(!body.project||!body.dateFrom){toast("A project name and start date are required.");return;}
+  $("#pm-save").disabled=true;
+  try{
+    if(state.pmEditing){
+      const prev=permits.find(x=>x.id===state.pmEditing)||{};
+      await db.doc("permits/"+state.pmEditing).set({...body,createdAt:prev.createdAt||now,createdBy:prev.createdBy||null});
+    }else{
+      await db.collection("permits").add({...body,createdAt:now,createdBy:uid||null});
+    }
+    closePermitForm();
+  }catch(err){writeErr(err,"save the permission");}
+  $("#pm-save").disabled=false;
+}
+function renderPmTiles(){
+  const active=permits.filter(p=>permitCovers(p,today())).length;
+  const tile=(label,n,sw)=>`<button class="tile" type="button" style="cursor:default">
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#pm-tiles").innerHTML=
+    tile("Active today",active,active?"green":null)+
+    tile("Permissions logged",permits.length,null);
+  const badge=$("#tab-permit");
+  badge.hidden=!active; if(active)badge.textContent=active+" active";
+}
+function renderPermits(){
+  renderPmTiles();
+  const rows=$("#pm-rows"), slot=$("#pm-empty");
+  let list=permits.slice().sort((a,b)=>String(b.dateFrom||"").localeCompare(String(a.dateFrom||"")));
+  if(state.pmQ)list=list.filter(p=>[p.project,p.reference,p.area,p.notes].join(" ").toLowerCase().includes(state.pmQ));
+  if(!pmLoaded){rows.innerHTML="";slot.innerHTML="";return;}
+  if(permits.length===0){
+    rows.innerHTML="";
+    slot.innerHTML=`<div class="empty"><h2>No permissions logged</h2>
+      <p>${canWrite?"Log each day's or project's operating permission — validity dates, altitude and distance limits, daylight conditions and the CAAT/NBTC reference. Flights then link to it and are checked automatically.":"Operating permissions logged by the team will appear here."}</p></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No permissions match the search.</p></div>`;
+  rows.innerHTML=list.map(p=>{
+    const active=permitCovers(p,today());
+    const span=p.dateTo&&p.dateTo!==p.dateFrom?`${fmtDate(p.dateFrom)} – ${fmtDate(p.dateTo)}`:fmtDate(p.dateFrom);
+    const nFlights=flights.filter(f=>f.permitId===p.id).length;
+    const chips=[
+      p.maxAltM!=null?`<span class="chip">Alt ≤ <b>${esc(p.maxAltM)} m</b></span>`:"",
+      p.maxDistM!=null?`<span class="chip">Dist ≤ <b>${esc(p.maxDistM)} m</b></span>`:"",
+      p.daylightOnly!==false?`<span class="chip"><b>Daylight only</b></span>`:"",
+      p.area?`<span class="chip">Area <b>${esc(p.area)}</b></span>`:"",
+      `<span class="chip"><b>${nFlights}</b> flight${nFlights===1?"":"s"}</span>`
+    ].filter(Boolean).join("");
+    return `<article class="card" data-tag="${active?"green":"white"}">
+      <div class="row-head">
+        <span class="when">${esc(span)}</span>
+        <h3>${esc(p.project)}</h3>
+        ${active?`<span class="pill active">Active today</span>`:""}
+      </div>
+      <div class="chips">${chips}</div>
+      ${p.reference?`<div class="statusline"><b>Reference:</b> ${esc(p.reference)}</div>`:""}
+      ${p.notes?`<p class="notes">${esc(p.notes)}</p>`:""}
+      ${canWrite?`<div class="actions">
+        <button class="btn" data-act="edit" data-id="${esc(p.id)}" type="button">Edit</button>
+        <button class="btn danger" data-act="rm" data-id="${esc(p.id)}" type="button">${state.confirmRm==="permits:"+p.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+$("#pm-rows").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="edit"){const p=permits.find(x=>x.id===id);if(p)openPermitForm(p);}
+  else if(b.dataset.act==="rm")confirmRemove("permits",id,"permission",renderPermits);
+});
+
+/* ================= FLIGHTS ================= */
+function assetOptions(cat,selId,required){
+  const items=assets.filter(a=>a.category===cat).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const opts=items.map(a=>`<option value="${esc(a.id)}" ${a.id===selId?"selected":""}>${esc(a.name)}${a.tag&&a.tag!=="white"?" ["+a.tag+" tag]":""}</option>`).join("");
+  return (required?`<option value="" disabled ${selId?"":"selected"}>Select…</option>`:`<option value="">—</option>`)+opts;
+}
+function permitOptions(selId,flightDate){
+  const items=permits.slice().sort((a,b)=>String(b.dateFrom||"").localeCompare(String(a.dateFrom||"")));
+  let sel=selId;
+  if(!sel&&flightDate){const cover=items.find(p=>permitCovers(p,flightDate));if(cover)sel=cover.id;}
+  return `<option value="">— none —</option>`+items.map(p=>`<option value="${esc(p.id)}" ${p.id===sel?"selected":""}>${esc(permitLabel(p))}</option>`).join("");
+}
+function updateDurHint(){
+  const s=toMin($("#fl-start").value), e=toMin($("#fl-end").value);
+  if(s==null||e==null){$("#fl-durhint").textContent="";return;}
+  const d=(e-s+1440)%1440;
+  $("#fl-durhint").textContent=d>0?`Duration: ${d} min${e<s?" (past midnight)":""}`:"";
+}
+function openFlightForm(f){
+  state.flEditing=f?f.id:null;
+  $("#fl-form-title").textContent=f?"Edit flight":"Post-flight report";
+  $("#fl-save").textContent=f?"Save changes":"Save flight";
+  $("#fl-date").value=f?.date||today();
+  $("#fl-start").value=f?.timeStart||"";
+  $("#fl-end").value=f?.timeEnd||"";
+  $("#fl-pilot").value=f?.pilot||"";
+  $("#fl-permit").innerHTML=permitOptions(f?.permitId,f?null:today());
+  $("#fl-aircraft").innerHTML=assetOptions("aircraft",f?.aircraftId,true);
+  $("#fl-battery").innerHTML=assetOptions("battery",f?.batteryId,false);
+  $("#fl-payload").innerHTML=assetOptions("payload",f?.payloadId,false);
+  $("#fl-rc").innerHTML=assetOptions("controller",f?.controllerId,false);
+  $("#fl-type").value=f?.ftype||"routine";
+  $("#fl-alt").value=f?.maxAltM??"";
+  $("#fl-dist").value=f?.maxDistM??"";
+  $("#fl-night").checked=!!f?.night;
+  $("#fl-notes").value=f?.notes||"";
+  $("#pilot-list").innerHTML=[...new Set([...pilots.map(p=>p.name),...flights.map(x=>x.pilot)].filter(Boolean))].map(p=>`<option value="${esc(p)}">`).join("");
+  updateDurHint();
+  $("#import-panel").hidden=true;
+  $("#flight-form").hidden=false;
+  $("#fl-date").focus();
+  $("#flight-form").scrollIntoView({block:"nearest"});
+}
+function closeFlightForm(){state.flEditing=null;$("#flight-form").hidden=true;}
+
+async function saveFlight(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const acId=$("#fl-aircraft").value;
+  const ac=assets.find(a=>a.id===acId);
+  if(!ac){toast("Select an aircraft (register it first on the Assets tab).");return;}
+  const ts=$("#fl-start").value, te=$("#fl-end").value;
+  const s=toMin(ts), en=toMin(te);
+  if(s==null||en==null){toast("Start and end times are required.");return;}
+  const dur=(en-s+1440)%1440;
+  if(dur<=0){toast("End time must be after the start time.");return;}
+  const pick=(sel)=>{const id=$(sel).value;const a=assets.find(x=>x.id===id);return {id:id||null,name:a?a.name:null};};
+  const bat=pick("#fl-battery"), pay=pick("#fl-payload"), rc=pick("#fl-rc");
+  const pmId=$("#fl-permit").value||null;
+  const pm=permits.find(p=>p.id===pmId);
+  const now=new Date().toISOString();
+  const body={
+    date:$("#fl-date").value, timeStart:ts, timeEnd:te, durationMin:dur,
+    pilot:$("#fl-pilot").value.trim(),
+    permitId:pmId, projectName:pm?pm.project:null,
+    aircraftId:ac.id, aircraftName:ac.name,
+    batteryId:bat.id, batteryName:bat.name,
+    payloadId:pay.id, payloadName:pay.name,
+    controllerId:rc.id, controllerName:rc.name,
+    ftype:$("#fl-type").value,
+    maxAltM:num($("#fl-alt").value), maxDistM:num($("#fl-dist").value),
+    night:$("#fl-night").checked,
+    notes:$("#fl-notes").value.trim(),
+    tagAtFlight:ac.tag||"white",
+    source:"manual",
+    updatedAt:now, updatedBy:uid||null
+  };
+  if(!body.date||!body.pilot){toast("Date and pilot are required.");return;}
+  $("#fl-save").disabled=true;
+  try{
+    if(state.flEditing){
+      const prev=flights.find(x=>x.id===state.flEditing)||{};
+      await db.doc("flights/"+state.flEditing).set({...body,source:prev.source||"manual",createdAt:prev.createdAt||now,createdBy:prev.createdBy||null});
+    }else{
+      await db.collection("flights").add({...body,createdAt:now,createdBy:uid||null});
+    }
+    if(body.tagAtFlight==="red")toast("Saved — flagged: this aircraft is red-tagged (not airworthy).");
+    closeFlightForm();
+  }catch(err){writeErr(err,"save the flight");}
+  $("#fl-save").disabled=false;
+}
+
+function flightFlags(f){
+  const out=[];
+  if(f.tagAtFlight==="red")out.push({lvl:"red",text:"Aircraft was red-tagged (not airworthy) when this flight was logged"});
+  else if(f.tagAtFlight==="green")out.push({lvl:"amber",text:"Aircraft was green-tagged (maintenance) when this flight was logged"});
+  const p=f.permitId?permits.find(x=>x.id===f.permitId):null;
+  if(!p){
+    out.push({lvl:"amber",text:"No permission / project linked to this flight"});
+  }else{
+    if(f.date&&!permitCovers(p,f.date))out.push({lvl:"red",text:`Flight date is outside the permission's validity (${fmtDate(p.dateFrom)}${p.dateTo&&p.dateTo!==p.dateFrom?" – "+fmtDate(p.dateTo):""})`});
+    if(p.maxAltM&&f.maxAltM&&f.maxAltM>p.maxAltM)out.push({lvl:"red",text:`Altitude ${f.maxAltM} m exceeds the ${p.maxAltM} m permission limit`});
+    if(p.maxDistM&&f.maxDistM&&f.maxDistM>p.maxDistM)out.push({lvl:"red",text:`Distance ${f.maxDistM} m exceeds the ${p.maxDistM} m permission limit`});
+    if(p.daylightOnly!==false&&f.night)out.push({lvl:"red",text:"Night flight under a daylight-only permission"});
+  }
+  return out;
+}
+function renderFlTiles(){
+  const totalMin=flights.reduce((s,f)=>s+(f.durationMin||0),0);
+  const flagged=flights.filter(f=>flightFlags(f).length).length;
+  const tile=(key,label,n,sw,on,click)=>`<button class="tile${on?" on":""}" data-key="${key}" type="button" ${click?"":'style="cursor:default"'}>
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#fl-tiles").innerHTML=
+    tile("all","Flights",flights.length,null,false,false)+
+    tile("hours","Flight hours",(totalMin/60).toFixed(1),null,false,false)+
+    tile("flagged","Flagged",flagged,flagged?"red":null,state.flFlagged,true);
+  $("#fl-tiles").querySelector('[data-key="flagged"]').addEventListener("click",()=>{state.flFlagged=!state.flFlagged;renderFlights();});
+  const badge=$("#tab-flag");
+  badge.hidden=!flagged; if(flagged){badge.textContent=flagged;badge.classList.add("alert");}
+}
+function renderFlights(){
+  const rows=$("#fl-rows"), slot=$("#fl-empty");
+  renderFlTiles();
+  let list=flights.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.timeStart||"").localeCompare(String(a.timeStart||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+  if(state.flFlagged)list=list.filter(f=>flightFlags(f).length);
+  if(state.flQ)list=list.filter(f=>[f.pilot,f.aircraftName,f.projectName,f.notes,f.batteryName,f.payloadName].join(" ").toLowerCase().includes(state.flQ));
+  if(!flLoaded){rows.innerHTML="";slot.innerHTML="";return;}
+  if(flights.length===0){
+    rows.innerHTML="";
+    slot.innerHTML=`<div class="empty"><h2>No flights logged yet</h2>
+      <p>${canWrite?"Use <b>Log flight</b> after each sortie — start/end times, pilot, project permission, and the aircraft, battery, payload and RC from the asset register. Each entry is checked against its permission automatically. Or <b>Import CSV</b> from a DJI FlightHub 2 export.":"Post-flight reports logged by the team will appear here with compliance flags."}</p></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No flights match the current filters.</p></div>`;
+  rows.innerHTML=list.map(f=>{
+    const flags=flightFlags(f);
+    const timeSpan=f.timeStart&&f.timeEnd?`${f.timeStart}–${f.timeEnd}`:"";
+    const chips=[
+      f.projectName?`<span class="chip">Project <b>${esc(f.projectName)}</b></span>`:"",
+      f.pilot?`<span class="chip">PIC <b>${esc(f.pilot)}</b></span>`:"",
+      f.batteryName?`<span class="chip">Batt <b>${esc(f.batteryName)}</b></span>`:"",
+      f.payloadName?`<span class="chip">Payload <b>${esc(f.payloadName)}</b></span>`:"",
+      f.controllerName?`<span class="chip">RC <b>${esc(f.controllerName)}</b></span>`:"",
+      (f.maxAltM!=null)?`<span class="chip">Alt <b>${esc(f.maxAltM)} m</b></span>`:"",
+      (f.maxDistM!=null)?`<span class="chip">Dist <b>${esc(f.maxDistM)} m</b></span>`:"",
+      f.night?`<span class="chip"><b>Night</b></span>`:"",
+      f.source==="import"?`<span class="chip">imported</span>`:""
+    ].filter(Boolean).join("");
+    const edge=flags.some(x=>x.lvl==="red")?"red":(flags.length?"amber":"white");
+    return `<article class="card" data-tag="${edge}">
+      <div class="row-head">
+        <span class="when">${esc(fmtDate(f.date))}${timeSpan?` · ${esc(timeSpan)}`:""}</span>
+        <h3>${esc(f.aircraftName||"Unknown aircraft")}</h3>
+        <span class="chip">${esc(FTYPE[f.ftype]||f.ftype||"")}</span>
+        <span class="dur">${f.durationMin??"?"}<small> min</small></span>
+      </div>
+      <div class="chips">${chips}</div>
+      ${flags.length?`<div class="flags">${flags.map(x=>`<span class="flag ${x.lvl}">⚑ ${esc(x.text)}</span>`).join("")}</div>`
+        :`<div class="flags"><span class="flag ok">Within permission limits</span></div>`}
+      ${f.notes?`<p class="notes">${esc(f.notes)}</p>`:""}
+      ${canWrite?`<div class="actions">
+        <button class="btn" data-act="edit" data-id="${esc(f.id)}" type="button">Edit</button>
+        <button class="btn danger" data-act="rm" data-id="${esc(f.id)}" type="button">${state.confirmRm==="flights:"+f.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+$("#fl-rows").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="edit"){const f=flights.find(x=>x.id===id);if(f)openFlightForm(f);}
+  else if(b.dataset.act==="rm")confirmRemove("flights",id,"flight",renderFlights);
+});
+
+/* ---------- CSV import ---------- */
+let csvRows=null, csvHeaders=null;
+const MAP_FIELDS=[
+  ["date","Date / time",["date","time","start"]],
+  ["dur","Duration",["duration","airtime","flight time","time(","total time"]],
+  ["pilot","Pilot",["pilot","operator","user"]],
+  ["aircraft","Aircraft",["aircraft","drone","device","model","uav"]],
+  ["alt","Max altitude (m)",["alt"]],
+  ["dist","Max distance (m)",["dist"]],
+  ["notes","Notes",["note","remark","detail"]]
+];
+function parseCSV(text){
+  const rows=[];let row=[],cur="",q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"')q=true;
+    else if(c===','){row.push(cur);cur="";}
+    else if(c==='\n'){row.push(cur);cur="";if(row.some(x=>x.trim()!==""))rows.push(row);row=[];}
+    else if(c!=='\r')cur+=c;
+  }
+  row.push(cur); if(row.some(x=>x.trim()!==""))rows.push(row);
+  return rows;
+}
+function onCsvFile(e){
+  const file=e.target.files&&e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const all=parseCSV(String(reader.result||""));
+    if(all.length<2){toast("That CSV has no data rows.");return;}
+    csvHeaders=all[0]; csvRows=all.slice(1);
+    const opts=csvHeaders.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join("");
+    $("#map-grid").innerHTML=MAP_FIELDS.map(([key,label,hints])=>{
+      const guess=csvHeaders.findIndex(h=>hints.some(k=>h.toLowerCase().includes(k)));
+      return `<label>${label}<select id="map-${key}"><option value="">— skip —</option>${opts}</select></label>`
+        .replace(`value="${guess}"`,`value="${guess}" selected`);
+    }).join("")+
+    `<label>Duration unit<select id="map-durunit"><option value="min">Minutes</option><option value="sec">Seconds</option></select></label>`+
+    `<label>Link to permission<select id="map-permit">${permitOptions(null,null)}</select></label>`;
+    $("#csv-map").hidden=false;
+    $("#csv-go").textContent=`Import ${csvRows.length} flights`;
+  };
+  reader.onerror=()=>toast("Couldn't read that file.");
+  reader.readAsText(file);
+}
+function resetImport(){
+  csvRows=csvHeaders=null;
+  $("#csv-file").value=""; $("#csv-map").hidden=true; $("#import-panel").hidden=true;
+}
+async function runImport(e){
+  e.preventDefault();
+  if(!csvRows||!db)return;
+  const col=k=>{const v=$("#map-"+k).value;return v===""?-1:parseInt(v,10);};
+  const m={date:col("date"),dur:col("dur"),pilot:col("pilot"),aircraft:col("aircraft"),alt:col("alt"),dist:col("dist"),notes:col("notes")};
+  if(m.date<0||m.dur<0){toast("Map at least the date and duration columns.");return;}
+  const secUnit=$("#map-durunit").value==="sec";
+  const pmId=$("#map-permit").value||null;
+  const pm=permits.find(p=>p.id===pmId);
+  const aircraftByName=name=>{
+    if(!name)return null;
+    const n=name.trim().toLowerCase();
+    return assets.find(a=>a.category==="aircraft"&&(String(a.name).toLowerCase()===n||String(a.model).toLowerCase()===n))
+      ||assets.find(a=>a.category==="aircraft"&&(String(a.name).toLowerCase().includes(n)||n.includes(String(a.name).toLowerCase())));
+  };
+  $("#csv-go").disabled=true;
+  let ok=0,skip=0,matched=0;
+  const now=new Date().toISOString();
+  for(const r of csvRows){
+    const get=i=>i>=0?String(r[i]||"").trim():"";
+    const d=new Date(get(m.date));
+    let dur=parseFloat(get(m.dur));
+    if(isNaN(d.getTime())||!isFinite(dur)||dur<=0){skip++;continue;}
+    if(secUnit)dur=dur/60;
+    dur=Math.round(dur*10)/10;
+    const acName=get(m.aircraft);
+    const ac=aircraftByName(acName);
+    if(ac)matched++;
+    const hasTime=/\d{1,2}:\d{2}/.test(get(m.date));
+    const tStart=hasTime?`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`:null;
+    let tEnd=null;
+    if(tStart!=null){const e2=(toMin(tStart)+Math.round(dur))%1440;tEnd=`${String(Math.floor(e2/60)).padStart(2,"0")}:${String(e2%60).padStart(2,"0")}`;}
+    const body={
+      date:d.toISOString().slice(0,10), timeStart:tStart, timeEnd:tEnd, durationMin:dur,
+      pilot:get(m.pilot)||"", permitId:pmId, projectName:pm?pm.project:null,
+      aircraftId:ac?ac.id:null, aircraftName:ac?ac.name:(acName||null),
+      batteryId:null,batteryName:null,payloadId:null,payloadName:null,controllerId:null,controllerName:null,
+      ftype:"routine", maxAltM:num(get(m.alt)), maxDistM:num(get(m.dist)),
+      night:false, notes:get(m.notes)||"", tagAtFlight:ac?(ac.tag||"white"):null,
+      source:"import", createdAt:now, createdBy:uid||null, updatedAt:now, updatedBy:uid||null
+    };
+    try{await db.collection("flights").add(body);ok++;}
+    catch(err){skip++;}
+  }
+  $("#csv-go").disabled=false;
+  resetImport();
+  toast(`Imported ${ok} flights (${matched} matched to registered aircraft${skip?`, ${skip} rows skipped`:""}).`);
+}
+
+/* ================= MISSIONS ================= */
+const CHECKS=[
+  ["permit","Permission valid for the mission date"],
+  ["weather","Weather checked and within limits"],
+  ["notam","NOTAMs reviewed"],
+  ["crew","Crew current and briefed"],
+  ["aircraft","Aircraft airworthy (white tag)"],
+  ["battery","Batteries charged and logged"],
+  ["survey","Site survey reviewed"],
+  ["comms","Comms and lost-link procedure briefed"],
+  ["abort","Emergency / abort plan in place"]
+];
+let msNotam=[], msSurvey=[], msRemovedFiles=[];
+function fileThumb(ev,removable){
+  const url="/_blob/"+ev.id, ct=String(ev.ct||"");
+  let media;
+  if(ct.startsWith("image"))media=`<img loading="lazy" src="${esc(url)}" alt="${esc(ev.name||"file")}">`;
+  else if(ct.startsWith("video"))media=`<video controls preload="metadata" src="${esc(url)}"></video>`;
+  else{
+    const ext=((String(ev.name||"").split(".").pop()||"").toUpperCase().slice(0,4))||"FILE";
+    media=`<a class="docbadge" href="${esc(url)}" target="_blank" rel="noopener"><span class="ext">${esc(ext)}</span>${esc(ev.name||"document")} ↗</a>`;
+  }
+  if(!removable)return media;
+  return (ct.startsWith("image")||ct.startsWith("video"))
+    ?`<span class="ev-item">${media}<button class="btn danger" type="button" data-evrm="${esc(ev.id)}">×</button></span>`
+    :`<span style="display:inline-flex;gap:4px;align-items:center">${media}<button class="btn danger" type="button" data-evrm="${esc(ev.id)}" style="padding:1px 8px;font-size:12px">×</button></span>`;
+}
+function crewRowHTML(c){
+  return `<div class="crew-row">
+    <input type="text" class="cr-name" placeholder="Name" maxlength="80" value="${esc(c?.name||"")}">
+    <input type="text" class="cr-role" placeholder="Role / cert no." maxlength="80" value="${esc(c?.role||"")}">
+    <label><input type="checkbox" class="cr-cur" ${!c||c.current!==false?"checked":""}> Current</label>
+    <button class="btn danger" type="button" data-crrm>×</button>
+  </div>`;
+}
+function renderMsEv(){
+  $("#ms-notam-ev").innerHTML=msNotam.map(ev=>fileThumb(ev,true)).join("");
+  $("#ms-survey-ev").innerHTML=msSurvey.map(ev=>fileThumb(ev,true)).join("");
+}
+function openMissionForm(m){
+  state.msEditing=m?m.id:null;
+  $("#ms-form-title").textContent=m?"Edit mission plan":"Mission plan";
+  $("#ms-save").textContent=m?"Save changes":"Save mission plan";
+  $("#ms-name").value=m?.name||"";
+  $("#ms-date").value=m?.date||today();
+  $("#ms-start").value=m?.timeStart||"";
+  $("#ms-permit").innerHTML=permitOptions(m?.permitId,m?null:today());
+  $("#ms-aircraft").innerHTML=assetOptions("aircraft",m?.aircraftId,true);
+  $("#ms-battery").innerHTML=assetOptions("battery",m?.batteryId,false);
+  $("#ms-payload").innerHTML=assetOptions("payload",m?.payloadId,false);
+  $("#ms-objective").value=m?.objective||"";
+  $("#ms-wind").value=m?.weather?.windMs??"";
+  $("#ms-gust").value=m?.weather?.gustMs??"";
+  $("#ms-vis").value=m?.weather?.visKm??"";
+  $("#ms-temp").value=m?.weather?.tempC??"";
+  $("#ms-wx").value=m?.weather?.notes||"";
+  $("#ms-notamtext").value=m?.notamText||"";
+  $("#ms-notamfiles").value=""; $("#ms-surveyfiles").value="";
+  msNotam=(m?.notamFiles||[]).slice(); msSurvey=(m?.surveyFiles||[]).slice(); msRemovedFiles=[];
+  renderMsEv();
+  const crew=(m?.crew&&m.crew.length)?m.crew:[null];
+  $("#ms-crew").innerHTML=crew.map(crewRowHTML).join("");
+  const ck=m?.checklist||{};
+  $("#ms-checks").innerHTML=CHECKS.map(([k,label])=>`<label><input type="checkbox" id="ck-${k}" ${ck[k]?"checked":""}> ${label}</label>`).join("");
+  $("#mission-form").hidden=false;
+  $("#ms-name").focus();
+  $("#mission-form").scrollIntoView({block:"nearest"});
+}
+function closeMissionForm(){state.msEditing=null;msNotam=[];msSurvey=[];msRemovedFiles=[];$("#mission-form").hidden=true;}
+
+async function uploadFiles(input,into,btn){
+  const files=[...(input.files||[])];
+  if(!files.length)return;
+  if(!assetsNs){toast("File upload isn't available for your access level.");return;}
+  for(let i=0;i<files.length;i++){
+    const file=files[i];
+    if(file.size>20*1024*1024){toast(`${file.name} is over 20 MB — skipped.`);continue;}
+    if(btn)btn.textContent=`Uploading ${i+1}/${files.length}…`;
+    try{const r=await assetsNs.upload(file);into.push({id:r.id,ct:r.contentType||file.type||"",name:file.name});}
+    catch(err){toast(`Couldn't upload ${file.name}: `+(err&&err.message||"error"));}
+  }
+}
+async function saveMission(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const acId=$("#ms-aircraft").value;
+  const ac=assets.find(a=>a.id===acId);
+  if(!ac){toast("Select an aircraft (register it first on the Assets tab).");return;}
+  const name=$("#ms-name").value.trim(), date=$("#ms-date").value;
+  if(!name||!date){toast("A mission name and date are required.");return;}
+  $("#ms-save").disabled=true;
+  await uploadFiles($("#ms-notamfiles"),msNotam,$("#ms-save"));
+  await uploadFiles($("#ms-surveyfiles"),msSurvey,$("#ms-save"));
+  const pmId=$("#ms-permit").value||null;
+  const pm=permits.find(p=>p.id===pmId);
+  const pick=(sel)=>{const id=$(sel).value;const a=assets.find(x=>x.id===id);return {id:id||null,name:a?a.name:null};};
+  const bat=pick("#ms-battery"), pay=pick("#ms-payload");
+  const crew=[...document.querySelectorAll("#ms-crew .crew-row")].map(r=>({
+    name:r.querySelector(".cr-name").value.trim(),
+    role:r.querySelector(".cr-role").value.trim(),
+    current:r.querySelector(".cr-cur").checked
+  })).filter(c=>c.name);
+  const checklist=Object.fromEntries(CHECKS.map(([k])=>[k,$("#ck-"+k).checked]));
+  const now=new Date().toISOString();
+  const prev=state.msEditing?(missions.find(x=>x.id===state.msEditing)||{}):{};
+  const body={
+    name,date,timeStart:$("#ms-start").value||null,
+    permitId:pmId, projectName:pm?pm.project:null,
+    aircraftId:ac.id, aircraftName:ac.name,
+    batteryId:bat.id, batteryName:bat.name,
+    payloadId:pay.id, payloadName:pay.name,
+    objective:$("#ms-objective").value.trim(),
+    weather:{windMs:num($("#ms-wind").value),gustMs:num($("#ms-gust").value),visKm:num($("#ms-vis").value),tempC:num($("#ms-temp").value),notes:$("#ms-wx").value.trim()},
+    notamText:$("#ms-notamtext").value.trim(),
+    notamFiles:msNotam, surveyFiles:msSurvey,
+    crew, checklist,
+    decision:prev.decision||"pending",
+    approvedBy:prev.approvedBy||null, approvedAt:prev.approvedAt||null,
+    createdAt:prev.createdAt||now, createdBy:prev.createdBy??(uid||null),
+    updatedAt:now, updatedBy:uid||null
+  };
+  try{
+    if(state.msEditing)await db.doc("missions/"+state.msEditing).set(body);
+    else await db.collection("missions").add(body);
+    if(assetsNs)for(const id of msRemovedFiles){try{await assetsNs.delete(id);}catch(err){}}
+    closeMissionForm();
+  }catch(err){writeErr(err,"save the mission plan");}
+  $("#ms-save").disabled=false;
+  $("#ms-save").textContent=state.msEditing?"Save changes":"Save mission plan";
+}
+async function decideMission(id,decision){
+  if(!db)return;
+  const inp=document.getElementById("ap-"+id);
+  const name=inp?inp.value.trim():"";
+  if(!name){toast("Enter the approving manager's name first.");return;}
+  const now=new Date().toISOString();
+  try{await db.doc("missions/"+id).update({decision,approvedBy:name,approvedAt:now,updatedAt:now,updatedBy:uid||null});}
+  catch(err){writeErr(err,"record the decision");}
+}
+async function resetMission(id){
+  if(!db)return;
+  try{await db.doc("missions/"+id).update({decision:"pending",approvedBy:null,approvedAt:null,updatedAt:new Date().toISOString(),updatedBy:uid||null});}
+  catch(err){writeErr(err,"reset the decision");}
+}
+async function removeMission(id){
+  const m=missions.find(x=>x.id===id);
+  await removeDoc("missions",id,"mission");
+  if(m&&assetsNs)for(const ev of [...(m.notamFiles||[]),...(m.surveyFiles||[])]){try{await assetsNs.delete(ev.id);}catch(err){}}
+}
+function missionFlags(m){
+  const out=[];
+  const ac=assets.find(a=>a.id===m.aircraftId);
+  if(ac&&ac.tag==="red")out.push({lvl:"red",text:`${ac.name} is currently red-tagged (not airworthy)`});
+  else if(ac&&ac.tag==="green")out.push({lvl:"amber",text:`${ac.name} is currently green-tagged (maintenance)`});
+  for(const fid of [m.batteryId,m.payloadId]){
+    if(!fid)continue;
+    const x=assets.find(a=>a.id===fid);
+    if(x&&x.tag==="red")out.push({lvl:"red",text:`${x.name} is currently red-tagged`});
+    else if(x&&x.tag==="green")out.push({lvl:"amber",text:`${x.name} is currently green-tagged (maintenance)`});
+  }
+  const p=m.permitId?permits.find(x=>x.id===m.permitId):null;
+  if(!p)out.push({lvl:"amber",text:"No permission / project linked to this mission"});
+  else if(m.date&&!permitCovers(p,m.date))out.push({lvl:"red",text:"Mission date is outside the permission's validity"});
+  const notCurrent=(m.crew||[]).filter(c=>c.current===false).map(c=>c.name);
+  if(notCurrent.length)out.push({lvl:"red",text:"Crew not current: "+notCurrent.join(", ")});
+  const done=CHECKS.filter(([k])=>m.checklist&&m.checklist[k]).length;
+  if(done<CHECKS.length)out.push({lvl:"amber",text:`Checklist incomplete (${done}/${CHECKS.length})`});
+  return out;
+}
+function renderMsTiles(){
+  const by=d=>missions.filter(m=>(m.decision||"pending")===d).length;
+  const tile=(key,label,n,sw,on)=>`<button class="tile${on?" on":""}" data-key="${key}" type="button">
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#ms-tiles").innerHTML=
+    tile("pending","Awaiting decision",by("pending"),by("pending")?"amber":null,state.msDecision==="pending")+
+    tile("go","Go",by("go"),"green",state.msDecision==="go")+
+    tile("nogo","No-go",by("nogo"),by("nogo")?"red":null,state.msDecision==="nogo")+
+    tile("all","Total missions",missions.length,null,false);
+  for(const b of $("#ms-tiles").querySelectorAll(".tile"))
+    b.addEventListener("click",()=>{const k=b.dataset.key;if(k==="all")return;state.msDecision=(state.msDecision===k)?null:k;renderMissions();});
+  const badge=$("#tab-mission");
+  const pending=by("pending");
+  badge.hidden=!pending; if(pending)badge.textContent=pending;
+}
+function renderMissions(){
+  if(!document.getElementById("ms-rows"))return;
+  renderMsTiles();
+  const rows=$("#ms-rows"), slot=$("#ms-empty");
+  let list=missions.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+  if(state.msDecision)list=list.filter(m=>(m.decision||"pending")===state.msDecision);
+  if(state.msQ)list=list.filter(m=>[m.name,m.aircraftName,m.projectName,m.objective,(m.crew||[]).map(c=>c.name).join(" ")].join(" ").toLowerCase().includes(state.msQ));
+  if(!msLoaded){rows.innerHTML="";slot.innerHTML="";return;}
+  if(missions.length===0){
+    rows.innerHTML="";
+    slot.innerHTML=`<div class="empty"><h2>No missions planned</h2>
+      <p>${canWrite?"Use <b>Plan mission</b> to build a go/no-go package: weather check, NOTAMs, crew currency, aircraft, site-survey PDFs and the pre-flight checklist — then a manager records the GO or NO-GO decision.":"Mission plans and go/no-go decisions will appear here."}</p></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No missions match the current filters.</p></div>`;
+  rows.innerHTML=list.map(m=>{
+    const flags=missionFlags(m);
+    const decision=m.decision||"pending";
+    const done=CHECKS.filter(([k])=>m.checklist&&m.checklist[k]).length;
+    const w=m.weather||{};
+    const chips=[
+      m.projectName?`<span class="chip">Project <b>${esc(m.projectName)}</b></span>`:"",
+      m.aircraftName?`<span class="chip">Aircraft <b>${esc(m.aircraftName)}</b></span>`:"",
+      m.batteryName?`<span class="chip">Batt <b>${esc(m.batteryName)}</b></span>`:"",
+      m.payloadName?`<span class="chip">Payload <b>${esc(m.payloadName)}</b></span>`:"",
+      (m.crew&&m.crew.length)?`<span class="chip">Crew <b>${esc(m.crew.map(c=>c.name).join(", "))}</b></span>`:"",
+      w.windMs!=null?`<span class="chip">Wind <b>${esc(w.windMs)}${w.gustMs!=null?` g${esc(w.gustMs)}`:""} m/s</b></span>`:"",
+      w.visKm!=null?`<span class="chip">Vis <b>${esc(w.visKm)} km</b></span>`:"",
+      w.tempC!=null?`<span class="chip">Temp <b>${esc(w.tempC)} °C</b></span>`:""
+    ].filter(Boolean).join("");
+    const files=[...(m.notamFiles||[]).map(ev=>fileThumb(ev,false)),...(m.surveyFiles||[]).map(ev=>fileThumb(ev,false))].join("");
+    const pill=decision==="go"?`<span class="pill closed">GO</span>`:decision==="nogo"?`<span class="pill sev-high">NO-GO</span>`:`<span class="pill open">Awaiting decision</span>`;
+    const edge=decision==="go"?"green":decision==="nogo"?"red":"amber";
+    let approval="";
+    if(decision==="pending"){
+      approval=(canWrite&&isAdmin)
+        ?`<div class="approve"><input id="ap-${esc(m.id)}" placeholder="Approving manager" maxlength="80">
+           <button class="btn go" data-act="go" data-id="${esc(m.id)}" type="button">GO</button>
+           <button class="btn nogo" data-act="nogo" data-id="${esc(m.id)}" type="button">NO-GO</button></div>`
+        :`<div class="statusline">Awaiting manager approval — only an editor of this page can record the decision</div>`;
+    }else{
+      approval=`<div class="statusline"><b class="decision">${decision==="go"?"GO":"NO-GO"}</b> — approved by <b>${esc(m.approvedBy||"")}</b>${m.approvedAt?` · ${fmtDate(m.approvedAt)}`:""}</div>`;
+    }
+    return `<article class="card" data-tag="${edge}">
+      <div class="row-head">
+        <span class="when">${esc(fmtDate(m.date))}${m.timeStart?` · ${esc(m.timeStart)}`:""}</span>
+        <h3>${esc(m.name)}</h3>
+        ${pill}
+        <span class="prog" style="margin-left:auto">Checklist ${done}/${CHECKS.length}</span>
+      </div>
+      ${chips?`<div class="chips">${chips}</div>`:""}
+      ${flags.length?`<div class="flags">${flags.map(x=>`<span class="flag ${x.lvl}">⚑ ${esc(x.text)}</span>`).join("")}</div>`
+        :`<div class="flags"><span class="flag ok">All checks complete — ready for decision</span></div>`}
+      ${m.objective?`<p class="notes">${esc(m.objective)}</p>`:""}
+      ${m.notamText?`<p class="notes"><b>NOTAMs:</b> ${esc(m.notamText)}</p>`:""}
+      ${w.notes?`<p class="notes"><b>Weather:</b> ${esc(w.notes)}</p>`:""}
+      ${files?`<div class="gallery">${files}</div>`:""}
+      ${approval}
+      ${canWrite?`<div class="actions">
+        <button class="btn" data-act="edit" data-id="${esc(m.id)}" type="button">Edit</button>
+        ${decision!=="pending"&&isAdmin?`<button class="btn" data-act="reset" data-id="${esc(m.id)}" type="button">Reset decision</button>`:""}
+        <button class="btn danger" data-act="rm" data-id="${esc(m.id)}" type="button">${state.confirmRm==="missions:"+m.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+$("#ms-q").addEventListener("input",e=>{state.msQ=e.target.value.trim().toLowerCase();renderMissions();});
+$("#btn-newmission").addEventListener("click",()=>openMissionForm(null));
+$("#ms-cancel").addEventListener("click",closeMissionForm);
+$("#mission-form").addEventListener("submit",saveMission);
+$("#ms-addcrew").addEventListener("click",()=>$("#ms-crew").insertAdjacentHTML("beforeend",crewRowHTML(null)));
+$("#ms-crew").addEventListener("click",e=>{const b=e.target.closest("button[data-crrm]");if(b)b.closest(".crew-row").remove();});
+$("#ms-notam-ev").addEventListener("click",e=>{const b=e.target.closest("button[data-evrm]");if(!b)return;msNotam=msNotam.filter(x=>x.id!==b.dataset.evrm);msRemovedFiles.push(b.dataset.evrm);renderMsEv();});
+$("#ms-survey-ev").addEventListener("click",e=>{const b=e.target.closest("button[data-evrm]");if(!b)return;msSurvey=msSurvey.filter(x=>x.id!==b.dataset.evrm);msRemovedFiles.push(b.dataset.evrm);renderMsEv();});
+$("#ms-rows").addEventListener("click",e=>{
+  const img=e.target.closest(".gallery img");
+  if(img){img.classList.toggle("zoom");return;}
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="go")decideMission(id,"go");
+  else if(b.dataset.act==="nogo")decideMission(id,"nogo");
+  else if(b.dataset.act==="reset")resetMission(id);
+  else if(b.dataset.act==="edit"){const m=missions.find(x=>x.id===id);if(m)openMissionForm(m);}
+  else if(b.dataset.act==="rm")confirmRemove("missions",id,"mission",renderMissions,()=>removeMission(id));
+});
+
+/* ================= CHECKOUT ================= */
+function activeLoan(assetId){return loans.find(l=>l.status==="out"&&l.assetId===assetId);}
+function openCheckoutForm(){
+  const items=assets.slice().sort((a,b)=>(CAT_RANK[a.category]??9)-(CAT_RANK[b.category]??9)||String(a.name||"").localeCompare(String(b.name||"")));
+  $("#co-asset").innerHTML=`<option value="" disabled selected>Select…</option>`+items.map(a=>{
+    const out=activeLoan(a.id);
+    return `<option value="${esc(a.id)}" ${out?"disabled":""}>${esc(a.name)}${out?" — already out":""}${a.tag&&a.tag!=="white"?" ["+a.tag+" tag]":""}</option>`;
+  }).join("");
+  $("#co-who").value="";
+  $("#co-date").value=today();
+  $("#co-due").value="";
+  $("#co-purpose").value="";
+  $("#co-list").innerHTML=[...new Set(loans.map(l=>l.outBy).filter(Boolean))].map(p=>`<option value="${esc(p)}">`).join("");
+  $("#checkout-form").hidden=false;
+  $("#co-asset").focus();
+  $("#checkout-form").scrollIntoView({block:"nearest"});
+}
+function closeCheckoutForm(){$("#checkout-form").hidden=true;}
+async function saveCheckout(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const aId=$("#co-asset").value;
+  const a=assets.find(x=>x.id===aId);
+  if(!a){toast("Select an asset.");return;}
+  if(activeLoan(aId)){toast("That asset is already checked out.");return;}
+  const who=$("#co-who").value.trim();
+  if(!who){toast("Who is taking it? A name is required.");return;}
+  const now=new Date().toISOString();
+  const body={
+    assetId:a.id, assetName:a.name, category:a.category,
+    outBy:who, outDate:$("#co-date").value||today(), due:$("#co-due").value||null,
+    purpose:$("#co-purpose").value.trim(),
+    tagAtOut:a.tag||"white",
+    status:"out", inDate:null, inNote:null,
+    createdAt:now, createdBy:uid||null, updatedAt:now, updatedBy:uid||null
+  };
+  $("#co-save").disabled=true;
+  try{
+    await db.collection("loans").add(body);
+    if(body.tagAtOut==="red")toast("Checked out — note: this asset is red-tagged (not airworthy).");
+    closeCheckoutForm();
+  }catch(err){writeErr(err,"check the asset out");}
+  $("#co-save").disabled=false;
+}
+async function confirmCheckIn(id){
+  if(!db)return;
+  const inp=document.getElementById("ci-"+id);
+  const note=inp?inp.value.trim():"";
+  const now=new Date().toISOString();
+  try{
+    await db.doc("loans/"+id).update({status:"returned",inDate:today(),inNote:note||null,updatedAt:now,updatedBy:uid||null});
+    state.ciId=null;
+  }catch(err){writeErr(err,"check the asset in");}
+}
+function renderCoTiles(){
+  const out=loans.filter(l=>l.status==="out");
+  const overdue=out.filter(l=>l.due&&l.due<today()).length;
+  const tile=(label,n,sw)=>`<button class="tile" type="button" style="cursor:default">
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#co-tiles").innerHTML=
+    tile("Out now",out.length,out.length?"amber":null)+
+    tile("Overdue",overdue,overdue?"red":null)+
+    tile("Returned",loans.length-out.length,null);
+  const badge=$("#tab-out");
+  badge.hidden=!out.length;
+  if(out.length){badge.textContent=out.length;badge.classList.toggle("alert",overdue>0);}
+}
+function renderCheckout(){
+  if(!document.getElementById("co-rows"))return;
+  renderCoTiles();
+  const rows=$("#co-rows"), slot=$("#co-empty");
+  let list=loans.slice().sort((a,b)=>{
+    if((a.status==="out")!==(b.status==="out"))return a.status==="out"?-1:1;
+    return String(b.outDate||"").localeCompare(String(a.outDate||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||""));
+  });
+  if(state.coQ)list=list.filter(l=>[l.assetName,l.outBy,l.purpose,l.inNote].join(" ").toLowerCase().includes(state.coQ));
+  if(!coLoaded){rows.innerHTML="";slot.innerHTML="";return;}
+  if(loans.length===0){
+    rows.innerHTML="";
+    slot.innerHTML=`<div class="empty"><h2>Nothing checked out</h2>
+      <p>${canWrite?"Use <b>Check out</b> when equipment leaves the store — who took it, when it's due back, and what for. Check it back in with a condition note when it returns.":"Equipment check-outs will appear here."}</p></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No check-outs match the search.</p></div>`;
+  rows.innerHTML=list.map(l=>{
+    const out=l.status==="out";
+    const overdue=out&&l.due&&l.due<today();
+    const a=assets.find(x=>x.id===l.assetId);
+    const flags=[];
+    if(overdue)flags.push({lvl:"red",text:`Overdue — expected back ${fmtDate(l.due)}`});
+    if(out&&a&&a.tag==="red")flags.push({lvl:"amber",text:`${a.name} is currently red-tagged (not airworthy)`});
+    const edge=out?(overdue?"red":"amber"):"white";
+    const checkin=(out&&canWrite&&state.ciId===l.id)
+      ?`<div class="approve"><input id="ci-${esc(l.id)}" placeholder="Condition / return note (optional)" maxlength="200">
+         <button class="btn go" data-act="ci-confirm" data-id="${esc(l.id)}" type="button">Confirm check-in</button>
+         <button class="btn" data-act="ci-cancel" type="button">Cancel</button></div>`:"";
+    return `<article class="card" data-tag="${edge}">
+      <div class="row-head">
+        <span class="when">${esc(fmtDate(l.outDate))}${l.due?` → due ${esc(fmtDate(l.due))}`:""}</span>
+        <h3>${esc(l.assetName)}</h3>
+        <span class="pill ${out?"open":"closed"}" style="margin-left:auto">${out?"Out":"Returned"}</span>
+      </div>
+      <div class="chips">
+        <span class="chip">To <b>${esc(l.outBy)}</b></span>
+        ${l.category?`<span class="chip">${esc(CAT_LABEL[l.category]||l.category)}</span>`:""}
+      </div>
+      ${flags.length?`<div class="flags">${flags.map(x=>`<span class="flag ${x.lvl}">⚑ ${esc(x.text)}</span>`).join("")}</div>`:""}
+      ${l.purpose?`<p class="notes">${esc(l.purpose)}</p>`:""}
+      ${!out?`<div class="statusline">Returned ${esc(fmtDate(l.inDate||l.updatedAt))}${l.inNote?` — ${esc(l.inNote)}`:""}</div>`:""}
+      ${checkin}
+      ${canWrite?`<div class="actions">
+        ${out&&state.ciId!==l.id?`<button class="btn" data-act="ci" data-id="${esc(l.id)}" type="button">Check in</button>`:""}
+        <button class="btn danger" data-act="rm" data-id="${esc(l.id)}" type="button">${state.confirmRm==="loans:"+l.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+$("#co-q").addEventListener("input",e=>{state.coQ=e.target.value.trim().toLowerCase();renderCheckout();});
+$("#btn-checkout").addEventListener("click",openCheckoutForm);
+$("#co-cancel").addEventListener("click",closeCheckoutForm);
+$("#checkout-form").addEventListener("submit",saveCheckout);
+$("#co-rows").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="ci"){state.ciId=id;renderCheckout();const i=document.getElementById("ci-"+id);if(i)i.focus();}
+  else if(b.dataset.act==="ci-confirm")confirmCheckIn(id);
+  else if(b.dataset.act==="ci-cancel"){state.ciId=null;renderCheckout();}
+  else if(b.dataset.act==="rm")confirmRemove("loans",id,"check-out record",renderCheckout);
+});
+
+/* ================= PEOPLE ================= */
+const CERT_SOON_DAYS=30;
+const CERT_PROMPT=`This image is a UAV remote-pilot certificate (likely a Thai CAAT UAS pilot certificate; it may be in Thai). Read it and reply with only a JSON object exactly like:
+{"name": "...", "certNo": "...", "certType": "...", "issueDate": "YYYY-MM-DD", "expiryDate": "YYYY-MM-DD"}
+Rules: certNo is the certificate/licence number exactly as printed. certType is the certificate category or weight class, briefly in English (for example "UAV weight not exceeding 25 kg"). Convert dates to Gregorian YYYY-MM-DD; Thai Buddhist era (พ.ศ.) years are 543 ahead of Gregorian, so subtract 543. Use null for any field you cannot read clearly.`;
+let ppCert=[], ppDocs=[], ppRemovedFiles=[];
+function certStatus(p){
+  if(!p.certExpiry)return "none";
+  const t=today();
+  if(p.certExpiry<t)return "expired";
+  const soon=new Date(Date.now()+CERT_SOON_DAYS*864e5).toISOString().slice(0,10);
+  return p.certExpiry<=soon?"soon":"ok";
+}
+function daysTo(dateStr){
+  return Math.round((new Date(dateStr+"T00:00")-new Date(today()+"T00:00"))/864e5);
+}
+function renderPpEv(){
+  $("#pp-cert-ev").innerHTML=ppCert.map(ev=>fileThumb(ev,true)).join("");
+  $("#pp-docs-ev").innerHTML=ppDocs.map(ev=>fileThumb(ev,true)).join("");
+}
+function updateReadBtn(){
+  const f=$("#pp-certfile").files&&$("#pp-certfile").files[0];
+  const isImg=f&&String(f.type||"").startsWith("image");
+  $("#pp-read").hidden=!(f&&isImg&&sampleNs&&sampleImgOk);
+  $("#pp-read-status").textContent=(f&&!isImg)?"Auto-read works on photos — for a PDF, type the details below.":"";
+}
+function openPilotForm(p){
+  state.ppEditing=p?p.id:null;
+  $("#pp-form-title").textContent=p?"Edit pilot":"Add pilot";
+  $("#pp-save").textContent=p?"Save changes":"Save pilot";
+  $("#pp-name").value=p?.name||"";
+  $("#pp-role").value=p?.role||"";
+  $("#pp-certno").value=p?.certNo||"";
+  $("#pp-certtype").value=p?.certType||"";
+  $("#pp-issue").value=p?.certIssue||"";
+  $("#pp-expiry").value=p?.certExpiry||"";
+  $("#pp-notes").value=p?.notes||"";
+  $("#pp-certfile").value=""; $("#pp-docs").value="";
+  $("#pp-read-status").textContent="";
+  ppCert=(p?.certFiles||[]).slice(); ppDocs=(p?.otherDocs||[]).slice(); ppRemovedFiles=[];
+  renderPpEv(); updateReadBtn();
+  $("#pilot-form").hidden=false;
+  $("#pp-name").focus();
+  $("#pilot-form").scrollIntoView({block:"nearest"});
+}
+function closePilotForm(){state.ppEditing=null;ppCert=[];ppDocs=[];ppRemovedFiles=[];$("#pilot-form").hidden=true;}
+
+async function readCert(){
+  const f=$("#pp-certfile").files&&$("#pp-certfile").files[0];
+  if(!f||!sampleNs)return;
+  const st=$("#pp-read-status");
+  $("#pp-read").disabled=true;
+  st.textContent="Reading the certificate…";
+  try{
+    const out=await sampleNs.json(CERT_PROMPT,{images:[f]});
+    const isDate=v=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
+    let got=0;
+    if(out&&typeof out==="object"){
+      if(out.certNo){$("#pp-certno").value=String(out.certNo);got++;}
+      if(out.certType){$("#pp-certtype").value=String(out.certType);got++;}
+      if(isDate(out.issueDate)){$("#pp-issue").value=out.issueDate;got++;}
+      if(isDate(out.expiryDate)){$("#pp-expiry").value=out.expiryDate;got++;}
+      if(out.name&&!$("#pp-name").value.trim())$("#pp-name").value=String(out.name);
+    }
+    st.textContent=got?`Read ${got} field${got===1?"":"s"} — check them against the certificate before saving.`:"Couldn't read the details — type them below.";
+  }catch(err){
+    st.textContent=(err&&err.code==="not_granted")?"Reading needs permission to ask Claude — type the details below."
+      :(err&&err.code==="rate_limited")?"Too many reads right now — try again in a moment or type the details."
+      :"Couldn't read the photo — type the details below.";
+  }
+  $("#pp-read").disabled=false;
+}
+async function savePilot(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const name=$("#pp-name").value.trim();
+  if(!name){toast("A name is required.");return;}
+  $("#pp-save").disabled=true;
+  await uploadFiles($("#pp-certfile"),ppCert,$("#pp-save"));
+  await uploadFiles($("#pp-docs"),ppDocs,$("#pp-save"));
+  const now=new Date().toISOString();
+  const prev=state.ppEditing?(pilots.find(x=>x.id===state.ppEditing)||{}):{};
+  const body={
+    name, role:$("#pp-role").value.trim(),
+    certNo:$("#pp-certno").value.trim(),
+    certType:$("#pp-certtype").value.trim(),
+    certIssue:$("#pp-issue").value||null,
+    certExpiry:$("#pp-expiry").value||null,
+    certFiles:ppCert, otherDocs:ppDocs,
+    notes:$("#pp-notes").value.trim(),
+    createdAt:prev.createdAt||now, createdBy:prev.createdBy??(uid||null),
+    updatedAt:now, updatedBy:uid||null
+  };
+  try{
+    if(state.ppEditing)await db.doc("pilots/"+state.ppEditing).set(body);
+    else await db.collection("pilots").add(body);
+    if(assetsNs)for(const id of ppRemovedFiles){try{await assetsNs.delete(id);}catch(err){}}
+    closePilotForm();
+  }catch(err){writeErr(err,"save the pilot");}
+  $("#pp-save").disabled=false;
+  $("#pp-save").textContent=state.ppEditing?"Save changes":"Save pilot";
+}
+async function removePilot(id){
+  const p=pilots.find(x=>x.id===id);
+  await removeDoc("pilots",id,"pilot");
+  if(p&&assetsNs)for(const ev of [...(p.certFiles||[]),...(p.otherDocs||[])]){try{await assetsNs.delete(ev.id);}catch(err){}}
+}
+function renderPpTiles(){
+  const by=k=>pilots.filter(p=>certStatus(p)===k).length;
+  const tile=(key,label,n,sw,on,click)=>`<button class="tile${on?" on":""}" data-key="${key}" type="button" ${click?"":'style="cursor:default"'}>
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#pp-tiles").innerHTML=
+    tile("ok","Current",by("ok"),"green",state.ppFilter==="ok",true)+
+    tile("soon","Expiring ≤ 30 days",by("soon"),by("soon")?"amber":null,state.ppFilter==="soon",true)+
+    tile("expired","Expired",by("expired"),by("expired")?"red":null,state.ppFilter==="expired",true)+
+    tile("all","Pilots",pilots.length,null,false,false);
+  for(const b of $("#pp-tiles").querySelectorAll(".tile"))
+    b.addEventListener("click",()=>{const k=b.dataset.key;if(k==="all")return;state.ppFilter=(state.ppFilter===k)?null:k;renderPilots();});
+  const badge=$("#tab-cert");
+  const attn=by("soon")+by("expired");
+  badge.hidden=!attn;
+  if(attn){badge.textContent=attn;badge.classList.toggle("alert",by("expired")>0);}
+}
+function renderPilots(){
+  if(!document.getElementById("pp-rows"))return;
+  renderPpTiles();
+  const rows=$("#pp-rows"), slot=$("#pp-empty");
+  let list=pilots.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+  if(state.ppFilter)list=list.filter(p=>certStatus(p)===state.ppFilter);
+  if(state.ppQ)list=list.filter(p=>[p.name,p.role,p.certNo,p.notes].join(" ").toLowerCase().includes(state.ppQ));
+  if(!ppLoaded){rows.innerHTML="";slot.innerHTML="";return;}
+  if(pilots.length===0){
+    rows.innerHTML="";
+    slot.innerHTML=`<div class="empty"><h2>No pilots on file</h2>
+      <p>${canWrite?"Use <b>Add pilot</b> to build the roster. Attach a photo of each CAAT pilot certificate — the page can read the certificate number and dates straight from the photo — and the board tracks who is current, expiring or expired.":"The pilot roster and certificate currency will appear here."}</p></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No pilots match the current filters.</p></div>`;
+  rows.innerHTML=list.map(p=>{
+    const st=certStatus(p);
+    const edge=st==="expired"?"red":st==="soon"?"amber":"white";
+    const pill=st==="ok"?`<span class="pill closed">Current</span>`
+      :st==="soon"?`<span class="pill open">Expires soon</span>`
+      :st==="expired"?`<span class="pill sev-high">Expired</span>`
+      :`<span class="pill">No cert on file</span>`;
+    const d=p.certExpiry?daysTo(p.certExpiry):null;
+    const gallery=[...(p.certFiles||[]).map(ev=>fileThumb(ev,false)),...(p.otherDocs||[]).map(ev=>fileThumb(ev,false))].join("");
+    return `<article class="card" data-tag="${edge}">
+      <div class="row-head">
+        <h3>${esc(p.name)}</h3>
+        ${p.role?`<span class="chip">${esc(p.role)}</span>`:""}
+        <span style="margin-left:auto">${pill}</span>
+      </div>
+      ${(p.certNo||p.certType)?`<div class="meta">${p.certNo?`CAAT cert ${esc(p.certNo)}`:""}${(p.certNo&&p.certType)?" · ":""}${p.certType?esc(p.certType):""}</div>`:""}
+      ${(p.certIssue||p.certExpiry)?`<div class="statusline">${p.certIssue?`Issued ${esc(fmtDate(p.certIssue))}`:""}${(p.certIssue&&p.certExpiry)?" · ":""}${p.certExpiry?`<b>Expires ${esc(fmtDate(p.certExpiry))}</b>${d!=null?` (${d>=0?d+" days":Math.abs(d)+" days ago"})`:""}`:""}</div>`:""}
+      ${gallery?`<div class="gallery">${gallery}</div>`:""}
+      ${p.notes?`<p class="notes">${esc(p.notes)}</p>`:""}
+      ${canWrite?`<div class="actions">
+        <button class="btn" data-act="edit" data-id="${esc(p.id)}" type="button">Edit</button>
+        <button class="btn danger" data-act="rm" data-id="${esc(p.id)}" type="button">${state.confirmRm==="pilots:"+p.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+$("#pp-q").addEventListener("input",e=>{state.ppQ=e.target.value.trim().toLowerCase();renderPilots();});
+$("#btn-newpilot").addEventListener("click",()=>openPilotForm(null));
+$("#pp-cancel").addEventListener("click",closePilotForm);
+$("#pilot-form").addEventListener("submit",savePilot);
+$("#pp-certfile").addEventListener("change",updateReadBtn);
+$("#pp-read").addEventListener("click",readCert);
+$("#pp-cert-ev").addEventListener("click",e=>{const b=e.target.closest("button[data-evrm]");if(!b)return;ppCert=ppCert.filter(x=>x.id!==b.dataset.evrm);ppRemovedFiles.push(b.dataset.evrm);renderPpEv();});
+$("#pp-docs-ev").addEventListener("click",e=>{const b=e.target.closest("button[data-evrm]");if(!b)return;ppDocs=ppDocs.filter(x=>x.id!==b.dataset.evrm);ppRemovedFiles.push(b.dataset.evrm);renderPpEv();});
+$("#pp-rows").addEventListener("click",e=>{
+  const img=e.target.closest(".gallery img");
+  if(img){img.classList.toggle("zoom");return;}
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="edit"){const p=pilots.find(x=>x.id===id);if(p)openPilotForm(p);}
+  else if(b.dataset.act==="rm")confirmRemove("pilots",id,"pilot",renderPilots,()=>removePilot(id));
+});
+
+/* ================= SOPS ================= */
+const SOP_TYPE={sop:"SOP",emergency:"Emergency procedure",checklist:"Checklist"};
+const SOP_RANK={emergency:0,sop:1,checklist:2};
+let soFiles=[], soRemovedFiles=[];
+function renderSoEv(){$("#so-ev").innerHTML=soFiles.map(ev=>fileThumb(ev,true)).join("");}
+function openSopForm(s){
+  state.soEditing=s?s.id:null;
+  $("#so-form-title").textContent=s?"Edit procedure":"Add procedure";
+  $("#so-save").textContent=s?"Save changes":"Save procedure";
+  $("#so-title").value=s?.title||"";
+  $("#so-type").value=s?.category||"sop";
+  $("#so-rev").value=s?.rev||"v1";
+  $("#so-rev").dataset.orig=s?(s.rev||""):"";
+  $("#so-rev-hint").hidden=true;
+  $("#so-date").value=s?.effectiveDate||today();
+  $("#so-notes").value=s?.notes||"";
+  $("#so-files").value="";
+  soFiles=(s?.files||[]).slice(); soRemovedFiles=[];
+  renderSoEv();
+  $("#sop-form").hidden=false;
+  $("#so-title").focus();
+  $("#sop-form").scrollIntoView({block:"nearest"});
+}
+function closeSopForm(){state.soEditing=null;soFiles=[];soRemovedFiles=[];$("#sop-form").hidden=true;}
+async function saveSop(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const title=$("#so-title").value.trim();
+  if(!title){toast("A title is required.");return;}
+  $("#so-save").disabled=true;
+  await uploadFiles($("#so-files"),soFiles,$("#so-save"));
+  const now=new Date().toISOString();
+  const prev=state.soEditing?(sops.find(x=>x.id===state.soEditing)||{}):{};
+  const newRev=$("#so-rev").value.trim();
+  let files=soFiles, history=(prev.history||[]).slice();
+  if(state.soEditing&&(prev.rev||"")!==newRev){
+    const prevIds=new Set((prev.files||[]).map(f=>f.id));
+    history.push({rev:prev.rev||"",effectiveDate:prev.effectiveDate||null,notes:prev.notes||"",files:(prev.files||[]).slice(),archivedAt:now});
+    files=soFiles.filter(f=>!prevIds.has(f.id));
+    soRemovedFiles=soRemovedFiles.filter(id=>!prevIds.has(id));
+  }
+  const body={
+    title, category:$("#so-type").value, rev:newRev,
+    effectiveDate:$("#so-date").value||null,
+    notes:$("#so-notes").value.trim(), files, history,
+    createdAt:prev.createdAt||now, createdBy:prev.createdBy??(uid||null),
+    updatedAt:now, updatedBy:uid||null
+  };
+  try{
+    if(state.soEditing)await db.doc("sops/"+state.soEditing).set(body);
+    else await db.collection("sops").add(body);
+    if(assetsNs)for(const id of soRemovedFiles){try{await assetsNs.delete(id);}catch(err){}}
+    closeSopForm();
+  }catch(err){writeErr(err,"save the procedure");}
+  $("#so-save").disabled=false;
+  $("#so-save").textContent=state.soEditing?"Save changes":"Save procedure";
+}
+async function removeSop(id){
+  const s=sops.find(x=>x.id===id);
+  await removeDoc("sops",id,"procedure");
+  for(const a of sopAcks.filter(x=>x.sopId===id)){try{await db.doc("sopacks/"+a.id).delete();}catch(err){}}
+  if(s&&assetsNs)for(const ev of [...(s.files||[]),...((s.history||[]).flatMap(h=>h.files||[]))]){try{await assetsNs.delete(ev.id);}catch(err){}}
+}
+async function signSop(id){
+  const s=sops.find(x=>x.id===id); if(!s||!db)return;
+  const nameEl=document.getElementById("sg-name-"+id), chkEl=document.getElementById("sg-chk-"+id);
+  const name=nameEl?nameEl.value.trim():"";
+  if(!name){toast("Enter your name to sign.");return;}
+  if(!chkEl||!chkEl.checked){toast("Tick the box to confirm you have read and understood it.");return;}
+  const rev=s.rev||"";
+  if(sopAcks.find(a=>a.sopId===id&&(a.rev||"")===rev&&String(a.name).toLowerCase()===name.toLowerCase())){
+    toast(name+" has already signed this revision.");return;
+  }
+  try{
+    await db.collection("sopacks").add({sopId:id,sopTitle:s.title||"",rev,name,at:new Date().toISOString(),createdBy:uid||null});
+    toast("Signed and dated — recorded.");
+  }catch(err){writeErr(err,"record the signature");}
+}
+function sopMissing(s){
+  if(!pilots.length)return [];
+  const rev=s.rev||"";
+  const signed=new Set(sopAcks.filter(a=>a.sopId===s.id&&(a.rev||"")===rev).map(a=>String(a.name).toLowerCase()));
+  return pilots.map(p=>p.name).filter(n=>n&&!signed.has(String(n).toLowerCase()));
+}
+function renderSoTiles(){
+  const pending=sops.filter(s=>sopMissing(s).length>0).length;
+  const tile=(key,label,n,sw,on,click)=>`<button class="tile${on?" on":""}" data-key="${key}" type="button" ${click?"":'style="cursor:default"'}>
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#so-tiles").innerHTML=
+    tile("all","Procedures",sops.length,null,false,false)+
+    tile("em","Emergency",sops.filter(s=>s.category==="emergency").length,null,false,false)+
+    tile("pending","Awaiting signatures",pending,pending?"amber":null,state.soPending,true)+
+    tile("sigs","Signatures",sopAcks.length,null,false,false);
+  const pb=$("#so-tiles").querySelector('[data-key="pending"]');
+  if(pb)pb.addEventListener("click",()=>{state.soPending=!state.soPending;renderSops();});
+  const badge=$("#tab-sop");
+  badge.hidden=!pending; if(pending)badge.textContent=pending;
+}
+function renderSops(){
+  if(!document.getElementById("so-rows"))return;
+  renderSoTiles();
+  $("#roster-list").innerHTML=pilots.map(p=>`<option value="${esc(p.name)}">`).join("");
+  const rows=$("#so-rows"), slot=$("#so-empty");
+  let list=sops.slice().sort((a,b)=>(SOP_RANK[a.category]??9)-(SOP_RANK[b.category]??9)||String(a.title||"").localeCompare(String(b.title||"")));
+  if(state.soCat)list=list.filter(s=>s.category===state.soCat);
+  if(state.soPending)list=list.filter(s=>sopMissing(s).length>0);
+  if(state.soQ)list=list.filter(s=>[s.title,s.notes,s.rev].join(" ").toLowerCase().includes(state.soQ));
+  if(!soLoaded){rows.innerHTML="";slot.innerHTML="";return;}
+  if(sops.length===0){
+    rows.innerHTML="";
+    slot.innerHTML=`<div class="empty"><h2>No procedures on file</h2>
+      <p>${canWrite?"Use <b>Add procedure</b> to keep SOPs, emergency procedures and checklists here — lost-link, abort, manual recovery, unsafe weather. Each pilot signs that they have read the current revision, and unsigned procedures are flagged.":"SOPs and emergency procedures will appear here with the team's signatures."}</p></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No procedures match the current filters.</p></div>`;
+  rows.innerHTML=list.map(s=>{
+    const rev=s.rev||"";
+    const missing=sopMissing(s);
+    const acks=sopAcks.filter(a=>a.sopId===s.id).sort((a,b)=>String(a.at||"").localeCompare(String(b.at||"")));
+    const cur=acks.filter(a=>(a.rev||"")===rev), stale=acks.filter(a=>(a.rev||"")!==rev);
+    const edge=missing.length?(s.category==="emergency"?"red":"amber"):"white";
+    const pill=s.category==="emergency"?`<span class="pill sev-high">Emergency</span>`:`<span class="pill">${esc(SOP_TYPE[s.category]||s.category)}</span>`;
+    const gallery=(s.files||[]).map(ev=>fileThumb(ev,false)).join("");
+    const histEntries=(s.history&&s.history.length)?s.history.slice().reverse():[];
+    const histOpen=!!state.soHist[s.id];
+    const hist=histEntries.length?`<div><button class="btn" data-act="hist" data-id="${esc(s.id)}" type="button" style="padding:4px 10px;font-size:13px">${histOpen?"▾":"▸"} Previous revisions (${histEntries.length})</button></div>`+(histOpen?histEntries.map(h=>`<div class="chips" style="opacity:.65"><span class="chip">rev <b>${esc(h.rev||"?")}</b>${h.effectiveDate?` · ${esc(fmtDate(h.effectiveDate))}`:""}${h.archivedAt?` · archived ${esc(fmtDate(h.archivedAt))}`:""}</span>${(h.files||[]).map(ev=>fileThumb(ev,false)).join("")}</div>`).join(""):""):"";
+    const flag=missing.length
+      ?`<span class="flag ${s.category==="emergency"?"red":"amber"}">⚑ Not yet acknowledged${rev?" (rev "+esc(rev)+")":""}: ${esc(missing.join(", "))}</span>`
+      :(pilots.length?`<span class="flag ok">Acknowledged by every pilot on the roster</span>`:"");
+    const sigs=cur.length?`<div class="chips">${cur.map(a=>`<span class="chip">✓ <b>${esc(a.name)}</b> · signed ${esc(fmtDate(a.at))}</span>`).join("")}</div>`:"";
+    const old=stale.length?`<div class="chips">${stale.map(a=>`<span class="chip" style="opacity:.55">✓ ${esc(a.name)} · ${esc(a.rev||"earlier rev")} (outdated)</span>`).join("")}</div>`:"";
+    const sign=canWrite?`<div class="approve">
+        <input id="sg-name-${esc(s.id)}" list="roster-list" placeholder="Your name" maxlength="80">
+        <label class="sign-chk"><input type="checkbox" id="sg-chk-${esc(s.id)}"> I have read and understood this procedure${rev?` (rev ${esc(rev)})`:""}</label>
+        <button class="btn go" data-act="sign" data-id="${esc(s.id)}" type="button">Sign</button>
+      </div>`:"";
+    return `<article class="card" data-tag="${edge}">
+      <div class="row-head">
+        ${s.effectiveDate?`<span class="when">Effective ${esc(fmtDate(s.effectiveDate))}</span>`:""}
+        <h3>${esc(s.title)}</h3>
+        ${pill}
+        ${rev?`<span class="chip" style="margin-left:auto">rev <b>${esc(rev)}</b></span>`:""}
+      </div>
+      ${s.notes?`<p class="notes">${esc(s.notes)}</p>`:""}
+      ${gallery?`<div class="gallery">${gallery}</div>`:""}
+      ${hist}
+      ${flag?`<div class="flags">${flag}</div>`:""}
+      ${sigs}${old}
+      ${sign}
+      ${canWrite?`<div class="actions">
+        <button class="btn" data-act="edit" data-id="${esc(s.id)}" type="button">Edit</button>
+        <button class="btn danger" data-act="rm" data-id="${esc(s.id)}" type="button">${state.confirmRm==="sops:"+s.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+$("#so-q").addEventListener("input",e=>{state.soQ=e.target.value.trim().toLowerCase();renderSops();});
+$("#so-cat").addEventListener("change",e=>{state.soCat=e.target.value;renderSops();});
+$("#btn-newsop").addEventListener("click",()=>openSopForm(null));
+$("#so-cancel").addEventListener("click",closeSopForm);
+$("#sop-form").addEventListener("submit",saveSop);
+$("#so-rev").addEventListener("input",()=>{
+  const h=$("#so-rev-hint"), orig=$("#so-rev").dataset.orig||"";
+  if(state.soEditing&&$("#so-rev").value.trim()!==orig){
+    h.hidden=false;
+    h.textContent=`Changing the revision archives the current files and summary under rev ${orig||"(unnamed)"} — they are kept and stay viewable under "Previous revisions". Upload the new document below.`;
+  }else h.hidden=true;
+});
+$("#so-ev").addEventListener("click",e=>{const b=e.target.closest("button[data-evrm]");if(!b)return;soFiles=soFiles.filter(x=>x.id!==b.dataset.evrm);soRemovedFiles.push(b.dataset.evrm);renderSoEv();});
+$("#so-rows").addEventListener("click",e=>{
+  const img=e.target.closest(".gallery img");
+  if(img){img.classList.toggle("zoom");return;}
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="sign")signSop(id);
+  else if(b.dataset.act==="hist"){state.soHist[id]=!state.soHist[id];renderSops();}
+  else if(b.dataset.act==="edit"){const s=sops.find(x=>x.id===id);if(s)openSopForm(s);}
+  else if(b.dataset.act==="rm")confirmRemove("sops",id,"procedure",renderSops,()=>removeSop(id));
+});
+
+/* ================= REPORTS ================= */
+let formEvidence=[], formRemoved=[];
+function evidenceThumb(ev,removable){
+  const url="/_blob/"+ev.id;
+  const media=String(ev.ct||"").startsWith("video")
+    ?`<video controls preload="metadata" src="${esc(url)}"></video>`
+    :`<img loading="lazy" src="${esc(url)}" alt="${esc(ev.name||"evidence")}">`;
+  return removable
+    ?`<span class="ev-item">${media}<button class="btn danger" type="button" data-evrm="${esc(ev.id)}">×</button></span>`
+    :media;
+}
+function renderFormEvidence(){
+  $("#rp-ev").innerHTML=formEvidence.map(ev=>evidenceThumb(ev,true)).join("");
+}
+$("#rp-ev").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-evrm]"); if(!b)return;
+  const id=b.dataset.evrm;
+  formEvidence=formEvidence.filter(ev=>ev.id!==id);
+  formRemoved.push(id);
+  renderFormEvidence();
+});
+function openReportForm(r){
+  state.rpEditing=r?r.id:null;
+  $("#rp-form-title").textContent=r?"Edit report":"New report";
+  $("#rp-save").textContent=r?"Save changes":"Save report";
+  $("#rp-type").value=r?.rtype||"incident";
+  $("#rp-date").value=r?.date||today();
+  $("#rp-sev").value=r?.severity||"low";
+  const items=assets.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  $("#rp-asset").innerHTML=`<option value="">—</option>`+items.map(a=>`<option value="${esc(a.id)}" ${r&&r.assetId===a.id?"selected":""}>${esc(a.name)}</option>`).join("");
+  $("#rp-title").value=r?.title||"";
+  $("#rp-desc").value=r?.description||"";
+  $("#rp-action").value=r?.action||"";
+  $("#rp-files").value="";
+  formEvidence=(r?.evidence||[]).slice();
+  formRemoved=[];
+  renderFormEvidence();
+  $("#report-form").hidden=false;
+  $("#rp-title").focus();
+  $("#report-form").scrollIntoView({block:"nearest"});
+}
+function closeReportForm(){state.rpEditing=null;formEvidence=[];formRemoved=[];$("#report-form").hidden=true;}
+
+async function saveReport(e){
+  e.preventDefault();
+  if(!db){toast("Not connected — can't save.");return;}
+  const saveBtn=$("#rp-save");
+  const files=[...($("#rp-files").files||[])];
+  saveBtn.disabled=true;
+  const uploaded=[];
+  if(files.length&&!assetsNs){toast("File upload isn't available for your access level — saving without attachments.");}
+  else{
+    for(let i=0;i<files.length;i++){
+      const file=files[i];
+      if(file.size>20*1024*1024){toast(`${file.name} is over 20 MB — skipped.`);continue;}
+      saveBtn.textContent=`Uploading ${i+1}/${files.length}…`;
+      try{
+        const r=await assetsNs.upload(file);
+        uploaded.push({id:r.id,ct:r.contentType||file.type||"",name:file.name});
+      }catch(err){toast(`Couldn't upload ${file.name}: `+(err&&err.message||"error"));}
+    }
+  }
+  const evidence=formEvidence.concat(uploaded);
+  const now=new Date().toISOString();
+  const aId=$("#rp-asset").value||null;
+  const a=assets.find(x=>x.id===aId);
+  const body={
+    rtype:$("#rp-type").value, date:$("#rp-date").value,
+    severity:$("#rp-sev").value,
+    assetId:aId, assetName:a?a.name:null,
+    title:$("#rp-title").value.trim(),
+    description:$("#rp-desc").value.trim(),
+    action:$("#rp-action").value.trim(),
+    evidence,
+    updatedAt:now, updatedBy:uid||null
+  };
+  if(!body.title||!body.date){toast("A date and title are required.");saveBtn.disabled=false;saveBtn.textContent=state.rpEditing?"Save changes":"Save report";return;}
+  try{
+    if(state.rpEditing){
+      const prev=reports.find(x=>x.id===state.rpEditing)||{};
+      await db.doc("reports/"+state.rpEditing).set({...body,status:prev.status||"open",createdAt:prev.createdAt||now,createdBy:prev.createdBy||null});
+    }else{
+      await db.collection("reports").add({...body,status:"open",createdAt:now,createdBy:uid||null});
+    }
+    if(assetsNs)for(const id of formRemoved){try{await assetsNs.delete(id);}catch(err){}}
+    closeReportForm();
+  }catch(err){writeErr(err,"save the report");}
+  saveBtn.disabled=false;
+  saveBtn.textContent=state.rpEditing?"Save changes":"Save report";
+}
+async function toggleReport(id){
+  const r=reports.find(x=>x.id===id); if(!r||!db)return;
+  try{await db.doc("reports/"+id).update({status:r.status==="open"?"closed":"open",updatedAt:new Date().toISOString(),updatedBy:uid||null});}
+  catch(err){writeErr(err,"update the report");}
+}
+async function removeReport(id){
+  const r=reports.find(x=>x.id===id);
+  await removeDoc("reports",id,"report");
+  if(r&&r.evidence&&assetsNs)for(const ev of r.evidence){try{await assetsNs.delete(ev.id);}catch(err){}}
+}
+function renderRpTiles(){
+  const open=reports.filter(r=>r.status==="open").length;
+  const by=t=>reports.filter(r=>r.rtype===t).length;
+  const tile=(key,label,n,sw,on)=>`<button class="tile${on?" on":""}" data-key="${key}" type="button">
+    <span class="n">${n}</span><span class="l">${sw?`<span class="sw ${sw}"></span>`:""}${label}</span></button>`;
+  $("#rp-tiles").innerHTML=
+    tile("open","Open",open,open?"amber":null,state.rpOpen)+
+    tile("incident","Incidents",by("incident"),null,state.rpType==="incident")+
+    tile("near-miss","Near misses",by("near-miss"),null,state.rpType==="near-miss")+
+    tile("defect","Defects",by("defect"),null,state.rpType==="defect");
+  for(const b of $("#rp-tiles").querySelectorAll(".tile")){
+    b.addEventListener("click",()=>{
+      const k=b.dataset.key;
+      if(k==="open")state.rpOpen=!state.rpOpen;
+      else state.rpType=(state.rpType===k)?null:k;
+      renderReports();
+    });
+  }
+  const badge=$("#tab-open");
+  badge.hidden=!open; if(open)badge.textContent=open;
+}
+function renderReports(){
+  renderRpTiles();
+  const rows=$("#rp-rows"), slot=$("#rp-empty");
+  let list=reports.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+  if(state.rpOpen)list=list.filter(r=>r.status==="open");
+  if(state.rpType)list=list.filter(r=>r.rtype===state.rpType);
+  if(state.rpQ)list=list.filter(r=>[r.title,r.description,r.action,r.assetName].join(" ").toLowerCase().includes(state.rpQ));
+  if(!rpLoaded){rows.innerHTML="";slot.innerHTML="";return;}
+  if(reports.length===0){
+    rows.innerHTML="";
+    slot.innerHTML=`<div class="empty"><h2>No reports filed</h2>
+      <p>${canWrite?"File incidents, near misses, defects and safety observations here, with photo or video evidence attached. Each report tracks severity, the asset involved, corrective action and open/closed status — the record a safety audit asks for.":"Incident, near-miss and defect reports filed by the team will appear here."}</p></div>`;
+    return;
+  }
+  slot.innerHTML=list.length?"":`<div class="empty"><p>No reports match the current filters.</p></div>`;
+  rows.innerHTML=list.map(r=>{
+    const edge=r.status==="open"?(r.severity==="high"?"red":"amber"):"white";
+    const gallery=(r.evidence&&r.evidence.length)?`<div class="gallery">${r.evidence.map(ev=>evidenceThumb(ev,false)).join("")}</div>`:"";
+    return `<article class="card" data-tag="${edge}">
+      <div class="row-head">
+        <span class="when">${esc(fmtDate(r.date))}</span>
+        <h3>${esc(r.title)}</h3>
+        <span class="pill">${esc(RTYPE[r.rtype]||r.rtype)}</span>
+        ${r.severity==="high"?`<span class="pill sev-high">High severity</span>`:r.severity==="medium"?`<span class="pill">Medium</span>`:""}
+        <span class="pill ${r.status==="open"?"open":"closed"}" style="margin-left:auto">${r.status==="open"?"Open":"Closed"}</span>
+      </div>
+      ${r.assetName?`<div class="chips"><span class="chip">Asset <b>${esc(r.assetName)}</b></span></div>`:""}
+      ${r.description?`<p class="notes">${esc(r.description)}</p>`:""}
+      ${gallery}
+      ${r.action?`<p class="notes"><b>Corrective action:</b> ${esc(r.action)}</p>`:""}
+      ${canWrite?`<div class="actions">
+        <button class="btn" data-act="toggle" data-id="${esc(r.id)}" type="button">${r.status==="open"?"Close report":"Reopen"}</button>
+        <button class="btn" data-act="edit" data-id="${esc(r.id)}" type="button">Edit</button>
+        <button class="btn danger" data-act="rm" data-id="${esc(r.id)}" type="button">${state.confirmRm==="reports:"+r.id?"Confirm removal":"Remove"}</button>
+      </div>`:""}
+    </article>`;
+  }).join("");
+}
+$("#rp-rows").addEventListener("click",e=>{
+  const img=e.target.closest(".gallery img");
+  if(img){img.classList.toggle("zoom");return;}
+  const b=e.target.closest("button[data-act]"); if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.act==="toggle")toggleReport(id);
+  else if(b.dataset.act==="edit"){const r=reports.find(x=>x.id===id);if(r)openReportForm(r);}
+  else if(b.dataset.act==="rm")confirmRemove("reports",id,"report",renderReports,()=>removeReport(id));
+});
+</script>
