@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: drone-ops-board
+    runtime: node
+    plan: starter        # needs a paid plan for the persistent disk below; on free, data resets on every deploy/restart
+    buildCommand: npm install
+    startCommand: node server.js
+    disk:
+      name: ops-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: CREW_CODE
+        sync: false      # set in the Render dashboard: the code pilots use to sign in
+      - key: ADMIN_CODE
+        sync: false      # set in the Render dashboard: the manager code (enables GO/NO-GO)
+      - key: ANTHROPIC_API_KEY
+        sync: false      # optional: enables reading cert details from photos

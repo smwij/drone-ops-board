@@ -1,0 +1,14 @@
+{
+  "name": "drone-ops-board",
+  "version": "1.0.0",
+  "private": true,
+  "description": "UAV operations management board: fleet readiness, missions, flight log, checkout, pilot currency, SOPs, reports, permissions.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

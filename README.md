@@ -26,28 +26,44 @@ awaiting signatures, missions awaiting decision).
 
 ## How it runs
 
-The page is a single `fleet-asset-register.html` published as a claude.ai Artifact.
-It has no backend of its own — it uses the Artifact runtime capabilities:
+The whole UI is one file, `fleet-asset-register.html`. It runs in two ways:
 
-- **`db`** — shared realtime document store (collections: `assets`, `flights`,
-  `reports`, `permits`, `missions`, `loans`, `pilots`, `sops`, `sopacks`).
-- **`assets`** — file store for certificates, SOP documents, NOTAMs, site surveys
-  and report evidence (`upload: "interact"` so Contributors can upload).
-- **`sample`** (`images: true`) — asks Claude to read certificate photos and
-  return the certificate number, type and dates as JSON.
-- **`user`** — access-level detection only (read-only viewers get a read-only
-  board; GO/NO-GO is gated to Editors). No viewer names are displayed.
+1. **As a claude.ai Artifact** (the original) — the claude.ai runtime provides the
+   shared database, file store and certificate photo-reading.
+2. **Standalone** (this repo) — `server.js` (Node/Express, no other runtime deps)
+   provides the same primitives behind a REST API, and `public/shim.js` implements
+   the `window.claude.use()` interface on top of it, so the page runs unmodified:
+   - JSON document store in `DATA_DIR/db.json` (collections: `assets`, `flights`,
+     `reports`, `permits`, `missions`, `loans`, `pilots`, `sops`, `sopacks`),
+     polled every 8 s in place of realtime snapshots.
+   - File store in `DATA_DIR/uploads/`, served at `/_blob/<id>` (sign-in required).
+   - Optional certificate OCR: `POST /api/ocr` forwards the photo to the Anthropic
+     API when `ANTHROPIC_API_KEY` is set; without it the page falls back to manual entry.
 
-Because of this, the app only works when opened as the claude.ai Artifact —
-hosting this file on a static host (GitHub Pages, Render, etc.) renders the UI
-but without the shared database, uploads or certificate reading.
+## Running locally
 
-## Access levels
+```
+npm install
+CREW_CODE=yourcrewcode ADMIN_CODE=yourmanagercode node server.js
+# open http://localhost:8080 and sign in with one of the codes
+```
 
-Shared from the page's Share menu:
+## Access codes
 
-- **Viewer** — read-only board.
-- **Contributor** — pilots: log flights, file reports, sign SOPs, check gear in/out, upload files.
-- **Editor** — managers: everything above plus GO/NO-GO decisions and page publishing.
+Two shared codes set by environment variables:
+
+- **`CREW_CODE`** — pilots: sign in to view and edit everything (log flights, sign
+  SOPs, file reports, check gear in/out, upload files).
+- **`ADMIN_CODE`** — managers: everything above plus the mission GO/NO-GO buttons.
+
+Without signing in, nothing is readable (the stored documents include pilot
+certificates, so the whole API requires a code).
+
+## Deploying on Render
+
+The repo includes `render.yaml`. In Render: **New → Blueprint**, pick this repo,
+then set `CREW_CODE`, `ADMIN_CODE` and (optionally) `ANTHROPIC_API_KEY` in the
+dashboard. Note the persistent disk in the blueprint needs a paid instance; on the
+free tier the database and uploads reset on every deploy or restart.
 
 Records marked "(sample)" are seeded demo data — edit or remove them from the UI.
