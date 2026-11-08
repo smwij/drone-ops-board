@@ -18,6 +18,19 @@ try { db = JSON.parse(fs.readFileSync(DB_FILE, "utf8")); } catch (e) {}
 db.collections = db.collections || {};
 db.files = db.files || {};
 
+// Seed sample data on an empty database (first boot, or after a free-tier reset).
+if (!Object.keys(db.collections).length) {
+  try {
+    const seed = JSON.parse(fs.readFileSync(path.join(__dirname, "seed.json"), "utf8"));
+    db.collections = seed.collections || {};
+    for (const [id, f] of Object.entries(seed.files || {})) {
+      fs.writeFileSync(path.join(UPLOADS, id), Buffer.from(f.content, "utf8"));
+      db.files[id] = { name: f.name, ct: f.ct, size: Buffer.byteLength(f.content, "utf8") };
+    }
+    console.log("Seeded sample data (database was empty).");
+  } catch (e) { /* no seed file — start empty */ }
+}
+
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
