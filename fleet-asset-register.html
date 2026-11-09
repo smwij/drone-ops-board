@@ -171,6 +171,33 @@ nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1p
 .gallery img{cursor:zoom-in}
 .gallery img.zoom{max-height:none;cursor:zoom-out}
 .ev-edit{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+/* ---- QR scanner dialog ---- */
+dialog#scan-dlg{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:18px;width:min(440px,94vw)}
+dialog#scan-dlg::backdrop{background:rgba(10,16,22,.55)}
+dialog#scan-dlg h2{margin:0 0 4px;font-family:var(--font-display);font-size:22px}
+.scanbox{position:relative;margin-top:10px;border-radius:10px;overflow:hidden;background:#000;min-height:180px}
+.scanbox video{display:block;width:100%;max-height:52vh;object-fit:contain}
+.scanbox canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.scanbox::after{content:"";position:absolute;inset:12%;border:2px solid rgba(255,255,255,.85);border-radius:10px;
+  box-shadow:0 0 0 999px rgba(0,0,0,.25);pointer-events:none}
+.scan-err{color:var(--tag-red)}
+#scan-cart{margin-top:10px}
+#scan-cart .chip button,#co-cart .chip button{all:unset;cursor:pointer;margin-left:6px;font-size:11px;opacity:.7}
+.scanrow{display:flex;gap:6px}
+.scanrow input{flex:1;min-width:0}
+/* ---- QR label sheet ---- */
+.labelgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.label{background:#fff;color:#000;border:1.5px dashed #9aa6ae;border-radius:10px;padding:12px 8px 10px;
+  display:flex;flex-direction:column;align-items:center;text-align:center;break-inside:avoid}
+.label .lqr img,.label .lqr canvas{width:96px;height:96px;display:block}
+.label .ln{font-weight:700;font-size:13px;margin-top:7px;line-height:1.25;overflow-wrap:anywhere;font-family:var(--font-body)}
+.label .ls{font-size:11px;color:#45525b;font-family:var(--font-mono);margin-top:2px;overflow-wrap:anywhere}
+@media print{
+  body{background:#fff!important}
+  body.labels-mode .wrap>header,body.labels-mode .tabs,body.labels-mode #notice,body.labels-mode #summary,
+  body.labels-mode .labels-actions,body.labels-mode .labels-note{display:none!important}
+  .label{border-color:#000}
+}
 .ev-item{position:relative}
 .ev-item .btn{position:absolute;top:4px;right:4px;padding:1px 8px;font-size:12px}
 .ev-item img,.ev-item video{max-height:90px;border-radius:6px;border:1px solid var(--line)}
@@ -248,6 +275,7 @@ a.chip{text-decoration:none}
     <div class="toolbar">
       <input type="search" id="q" placeholder="Search name, model, serial…" aria-label="Search assets">
       <select id="cat-filter" aria-label="Filter by category"><option value="">All categories</option></select>
+      <button class="btn" id="btn-labels" type="button">QR labels</button>
       <button class="btn primary" id="btn-register" type="button">+ Register asset</button>
     </div>
     <p class="legend">
@@ -261,7 +289,7 @@ a.chip{text-decoration:none}
         <label>Designation / name *<input id="f-name" required maxlength="100" placeholder="e.g. Matrice 4TD — DFR 1"></label>
         <label>Category *<select id="f-cat"></select></label>
         <label>Make / model<input id="f-model" maxlength="100" placeholder="e.g. DJI Matrice 4TD"></label>
-        <label>Serial no.<input id="f-serial" maxlength="80"></label>
+        <label>Serial no.<span class="scanrow"><input id="f-serial" maxlength="80"><button class="btn" type="button" id="f-serial-scan" title="Scan the serial sticker's QR or barcode">Scan</button></span></label>
         <label>Firmware<input id="f-fw" maxlength="60" placeholder="e.g. v10.1.0.03"></label>
         <label>Location / kit<input id="f-loc" maxlength="100" placeholder="e.g. Dock site A, flight case 2"></label>
       </div>
@@ -272,6 +300,14 @@ a.chip{text-decoration:none}
           <label><input type="radio" name="f-tag" id="f-tag-green" value="green"> Green — maintenance</label>
           <label><input type="radio" name="f-tag" id="f-tag-red" value="red"> Red — not airworthy</label>
         </div>
+      </fieldset>
+      <fieldset><legend>Photos</legend>
+        <label id="f-photos-label">Add photos<input type="file" id="f-photos" accept="image/*" multiple></label>
+        <div class="form-actions" style="margin-top:8px">
+          <button class="btn" type="button" id="f-take">Take photo</button>
+          <span class="hint" id="f-photos-status"></span>
+        </div>
+        <div class="ev-edit" id="f-photos-ev"></div>
       </fieldset>
       <label>Status note<input id="f-tagnote" maxlength="200" placeholder="Why this tag? e.g. 90-day inspection due"></label>
       <label>Notes<textarea id="f-notes" maxlength="1000"></textarea></label>
@@ -405,12 +441,15 @@ a.chip{text-decoration:none}
     <div class="tiles" id="co-tiles"></div>
     <div class="toolbar">
       <input type="search" id="co-q" placeholder="Search asset, person, purpose…" aria-label="Search check-outs">
+      <button class="btn primary" id="btn-scan" type="button">Scan</button>
       <button class="btn primary" id="btn-checkout" type="button">+ Check out</button>
     </div>
     <form id="checkout-form" class="panel" hidden>
-      <h2>Check out equipment</h2>
+      <h2 id="co-title">Check out equipment</h2>
+      <div class="chips" id="co-cart" hidden></div>
+      <div class="flags" id="co-returns" hidden></div>
       <div class="fgrid">
-        <label>Asset *<select id="co-asset" required></select></label>
+        <label id="co-asset-label">Asset *<select id="co-asset" required></select></label>
         <label>Checked out to *<input id="co-who" required maxlength="80" list="co-list"><datalist id="co-list"></datalist></label>
         <label>Date out *<input type="date" id="co-date" required></label>
         <label>Expected return<input type="date" id="co-due"></label>
@@ -573,7 +612,34 @@ a.chip{text-decoration:none}
     <div class="rows" id="pm-rows"></div>
     <div id="pm-empty"></div>
   </section>
+
+  <!-- ============ QR LABELS (print view) ============ -->
+  <section id="view-labels" hidden>
+    <div class="toolbar labels-actions">
+      <button class="btn" id="labels-back" type="button">‹ Back</button>
+      <button class="btn primary" id="labels-print" type="button">Print labels</button>
+    </div>
+    <p class="hint labels-note">Print, cut out, and stick one on each asset. Scanning a label — with the Scan button
+      in Checkout or a phone camera — opens that asset's check-out or check-in.</p>
+    <div class="labelgrid" id="labelgrid"></div>
+  </section>
 </div>
+
+<dialog id="scan-dlg">
+  <h2 id="scan-title">Scan assets</h2>
+  <p class="hint" id="scan-hint"></p>
+  <div class="scanbox"><video id="scan-video" playsinline muted autoplay></video><canvas id="scan-ov"></canvas></div>
+  <div class="chips" id="scan-cart" hidden></div>
+  <p class="hint scan-err" id="scan-err" hidden></p>
+  <div class="form-actions" id="scan-fallback" hidden>
+    <label class="btn">Take a photo of the code<input type="file" id="scan-photo" accept="image/*" capture="environment" hidden></label>
+  </div>
+  <div class="form-actions">
+    <button class="btn primary" id="scan-done" type="button" hidden>Done</button>
+    <button class="btn primary" id="scan-shutter" type="button" hidden>Capture</button>
+    <button class="btn" id="scan-cancel" type="button">Cancel</button>
+  </div>
+</dialog>
 
 <script>
 "use strict";
@@ -688,7 +754,7 @@ renderAll();
   db.collection("assets").onSnapshot(snap=>{
     if(!snap.metadata.fromCache)settle();
     assets=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
-    loaded=true; renderAll();
+    loaded=true; renderAll(); tryPendingScan();
   },err=>{clearTimeout(timer);loaded=true;notice("The shared register can't be reached right now ("+err.code+"). Changes are disabled.");renderAll();});
   db.collection("flights").onSnapshot(snap=>{
     if(!snap.metadata.fromCache)settle();
@@ -709,7 +775,7 @@ renderAll();
   },err=>{msLoaded=true;renderMissions();});
   db.collection("loans").onSnapshot(snap=>{
     loans=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
-    coLoaded=true; renderCheckout(); renderAssets(); renderSummary();
+    coLoaded=true; renderCheckout(); renderAssets(); renderSummary(); tryPendingScan();
   },err=>{coLoaded=true;renderCheckout();});
   db.collection("pilots").onSnapshot(snap=>{
     pilots=snap.docs.filter(x=>x.exists).map(x=>({id:x.id,...x.data()}));
@@ -726,7 +792,7 @@ renderAll();
 })();
 
 function applyGate(){
-  for(const id of ["btn-register","btn-logflight","btn-import","btn-newreport","btn-newpermit","btn-newmission","btn-checkout","btn-newpilot","btn-newsop"])$("#"+id).hidden=!canWrite;
+  for(const id of ["btn-register","btn-logflight","btn-import","btn-newreport","btn-newpermit","btn-newmission","btn-checkout","btn-newpilot","btn-newsop","btn-scan"])$("#"+id).hidden=!canWrite;
   $("#ro-pill").hidden=canWrite;
   if(!canWrite){closeForm();closeFlightForm();closeReportForm();closePermitForm();closeMissionForm();closeCheckoutForm();closePilotForm();closeSopForm();resetImport();}
 }
@@ -790,11 +856,14 @@ function openForm(asset){
   $("#f-notes").value=asset?.notes||"";
   const tag=asset?.tag||"white";
   for(const t of ["white","green","red"])$("#f-tag-"+t).checked=(t===tag);
+  fPhotos=(asset?.photos||[]).slice(); fRemovedPhotos=[];
+  $("#f-photos").value=""; $("#f-photos-status").textContent="";
+  renderFPhotos();
   $("#asset-form").hidden=false;
   $("#f-name").focus();
   $("#asset-form").scrollIntoView({block:"nearest"});
 }
-function closeForm(){state.editing=null;$("#asset-form").hidden=true;}
+function closeForm(){state.editing=null;fPhotos=[];fRemovedPhotos=[];$("#asset-form").hidden=true;}
 
 async function saveAsset(e){
   e.preventDefault();
@@ -810,6 +879,7 @@ async function saveAsset(e){
     tag:(document.querySelector("input[name=f-tag]:checked")||{}).value||"white",
     tagNote:$("#f-tagnote").value.trim(),
     notes:$("#f-notes").value.trim(),
+    photos:fPhotos,
     updatedAt:now, updatedBy:uid||null
   };
   if(!body.name){toast("A name is required.");return;}
@@ -821,6 +891,7 @@ async function saveAsset(e){
     }else{
       await db.collection("assets").add({...body,createdAt:now,createdBy:uid||null});
     }
+    if(assetsNs)for(const id of fRemovedPhotos){try{await assetsNs.delete(id);}catch(e){}}
     closeForm();
   }catch(err){writeErr(err,"save");}
   $("#btn-save").disabled=false;
@@ -912,6 +983,7 @@ function renderAssets(){
       <div class="tagrow">${tagBtns}</div>
       <div class="statusline">${status}</div>
       ${loan?`<div class="statusline">Checked out to <b>${esc(loan.outBy)}</b>${loan.due?` · due ${fmtDate(loan.due)}`:""}</div>`:""}
+      ${(a.photos&&a.photos.length)?`<div class="ev-edit">${a.photos.map(ev=>fileThumb(ev,false)).join("")}</div>`:""}
       ${a.notes?`<p class="notes">${esc(a.notes)}</p>`:""}
       ${canWrite?`<div class="actions">
         <button class="btn" data-act="edit" data-id="${esc(a.id)}" type="button">Edit</button>
@@ -1590,34 +1662,83 @@ function openCheckoutForm(){
   $("#co-due").value="";
   $("#co-purpose").value="";
   $("#co-list").innerHTML=[...new Set(loans.map(l=>l.outBy).filter(Boolean))].map(p=>`<option value="${esc(p)}">`).join("");
+  $("#co-cart").hidden=true; $("#co-returns").hidden=true;
+  $("#co-asset-label").hidden=false; $("#co-asset").required=true;
+  $("#co-title").textContent="Check out equipment";
+  $("#co-save").textContent="Check out";
   $("#checkout-form").hidden=false;
   $("#co-asset").focus();
   $("#checkout-form").scrollIntoView({block:"nearest"});
 }
-function closeCheckoutForm(){$("#checkout-form").hidden=true;}
+function closeCheckoutForm(){
+  coCart=[]; coCartReturns=[];
+  $("#co-cart").hidden=true; $("#co-returns").hidden=true;
+  $("#co-asset-label").hidden=false; $("#co-asset").required=true;
+  $("#co-title").textContent="Check out equipment";
+  $("#checkout-form").hidden=true;
+}
+// Scanner cart → one form, many loans (and scanned returns checked in together).
+function openCheckoutCart(){
+  const outs=coCart, rets=coCartReturns;
+  if(!outs.length&&!rets.length)return;
+  openCheckoutForm();
+  if(outs.length){
+    $("#co-asset-label").hidden=true; $("#co-asset").required=false;
+    $("#co-cart").hidden=false;
+    $("#co-cart").innerHTML=outs.map((a,i)=>`<span class="chip">${esc(a.name)}<button type="button" data-cartrm="${i}" aria-label="Remove">✕</button></span>`).join("");
+    $("#co-title").textContent="Check out "+outs.length+(outs.length===1?" asset":" assets");
+  }else{
+    $("#co-title").textContent="Check in "+rets.length+(rets.length===1?" asset":" assets");
+    $("#co-asset-label").hidden=true; $("#co-asset").required=false;
+  }
+  if(rets.length){
+    $("#co-returns").hidden=false;
+    $("#co-returns").innerHTML=`<span class="flag amber">⤺ Also checking in: ${rets.map(l=>esc(l.assetName)).join(", ")}</span>`;
+  }
+  $("#co-save").textContent=outs.length?"Save":"Confirm check-in";
+}
 async function saveCheckout(e){
   e.preventDefault();
   if(!db){toast("Not connected — can't save.");return;}
-  const aId=$("#co-asset").value;
-  const a=assets.find(x=>x.id===aId);
-  if(!a){toast("Select an asset.");return;}
-  if(activeLoan(aId)){toast("That asset is already checked out.");return;}
-  const who=$("#co-who").value.trim();
-  if(!who){toast("Who is taking it? A name is required.");return;}
   const now=new Date().toISOString();
-  const body={
-    assetId:a.id, assetName:a.name, category:a.category,
-    outBy:who, outDate:$("#co-date").value||today(), due:$("#co-due").value||null,
-    purpose:$("#co-purpose").value.trim(),
-    tagAtOut:a.tag||"white",
-    status:"out", inDate:null, inNote:null,
-    createdAt:now, createdBy:uid||null, updatedAt:now, updatedBy:uid||null
-  };
+  const cartMode=coCart.length||coCartReturns.length;
+  const who=$("#co-who").value.trim();
+  if(!who&&(coCart.length||!cartMode)){toast("Who is taking it? A name is required.");return;}
   $("#co-save").disabled=true;
   try{
-    await db.collection("loans").add(body);
-    if(body.tagAtOut==="red")toast("Checked out — note: this asset is red-tagged (not airworthy).");
-    closeCheckoutForm();
+    if(cartMode){
+      for(const a of coCart){
+        if(activeLoan(a.id))continue;   // raced out meanwhile — skip, not double-loan
+        await db.collection("loans").add({
+          assetId:a.id, assetName:a.name, category:a.category,
+          outBy:who, outDate:$("#co-date").value||today(), due:$("#co-due").value||null,
+          purpose:$("#co-purpose").value.trim(), tagAtOut:a.tag||"white",
+          status:"out", inDate:null, inNote:null,
+          createdAt:now, createdBy:uid||null, updatedAt:now, updatedBy:uid||null
+        });
+      }
+      for(const l of coCartReturns){
+        await db.doc("loans/"+l.id).update({status:"returned",inDate:today(),inNote:who?("received by "+who):null,updatedAt:now,updatedBy:uid||null});
+      }
+      toast("Saved "+(coCart.length+coCartReturns.length)+" item(s) ✓");
+      closeCheckoutForm();
+    }else{
+      const aId=$("#co-asset").value;
+      const a=assets.find(x=>x.id===aId);
+      if(!a){toast("Select an asset.");$("#co-save").disabled=false;return;}
+      if(activeLoan(aId)){toast("That asset is already checked out.");$("#co-save").disabled=false;return;}
+      const body={
+        assetId:a.id, assetName:a.name, category:a.category,
+        outBy:who, outDate:$("#co-date").value||today(), due:$("#co-due").value||null,
+        purpose:$("#co-purpose").value.trim(),
+        tagAtOut:a.tag||"white",
+        status:"out", inDate:null, inNote:null,
+        createdAt:now, createdBy:uid||null, updatedAt:now, updatedBy:uid||null
+      };
+      await db.collection("loans").add(body);
+      if(body.tagAtOut==="red")toast("Checked out — note: this asset is red-tagged (not airworthy).");
+      closeCheckoutForm();
+    }
   }catch(err){writeErr(err,"check the asset out");}
   $("#co-save").disabled=false;
 }
@@ -1695,7 +1816,7 @@ function renderCheckout(){
   }).join("");
 }
 $("#co-q").addEventListener("input",e=>{state.coQ=e.target.value.trim().toLowerCase();renderCheckout();});
-$("#btn-checkout").addEventListener("click",openCheckoutForm);
+$("#btn-checkout").addEventListener("click",()=>{coCart=[];coCartReturns=[];openCheckoutForm();});
 $("#co-cancel").addEventListener("click",closeCheckoutForm);
 $("#checkout-form").addEventListener("submit",saveCheckout);
 $("#co-rows").addEventListener("click",e=>{
@@ -1706,6 +1827,319 @@ $("#co-rows").addEventListener("click",e=>{
   else if(b.dataset.act==="ci-cancel"){state.ciId=null;renderCheckout();}
   else if(b.dataset.act==="rm")confirmRemove("loans",id,"check-out record",renderCheckout);
 });
+
+/* ================= QR SCANNING, LABELS & ASSET PHOTOS ================= */
+let coCart=[], coCartReturns=[];                 // scanner cart: assets to loan / loans to return
+let fPhotos=[], fRemovedPhotos=[];               // asset form photo evidence
+let scanMode=null;                               // "cart" | "serial" | "photo"
+let scanSerialCb=null, scanStream=null, scanTick=0, lastScan={code:"",t:0}, zxReader=null;
+
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("couldn't load "+src.split("/").pop()));document.head.appendChild(s);});}
+async function loadZXing(){
+  if(zxReader)return zxReader;
+  const m=await import("https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.0/reader/+esm");
+  await m.prepareZXingModule({fireImmediately:true});
+  return (zxReader=m);
+}
+function beep(){
+  try{const C=window.AudioContext||window.webkitAudioContext;const ctx=new C(),o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);o.frequency.value=1245;g.gain.value=.12;o.start();o.stop(ctx.currentTime+.12);
+    setTimeout(()=>ctx.close(),400);}catch(e){}
+  if(navigator.vibrate)try{navigator.vibrate(60);}catch(e){}
+}
+function scanMsg(msg){const el=$("#scan-err");el.textContent=msg||"";el.hidden=!msg;}
+function qrPayload(a){return location.origin+"/?scan="+a.id;}
+function assetByCode(text){
+  let code=String(text||"").trim();
+  try{code=new URL(code).searchParams.get("scan")||code;}catch(e){}
+  const n=code.toLowerCase().replace(/[^a-z0-9]/g,"");
+  if(!n)return null;
+  const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  return assets.find(a=>norm(a.id)===n)||assets.find(a=>a.serial&&norm(a.serial)===n)||null;
+}
+
+function updateScanCart(){
+  const box=$("#scan-cart");
+  box.hidden=!(coCart.length+coCartReturns.length);
+  box.innerHTML=
+    coCart.map((a,i)=>`<span class="chip">${esc(a.name)}<button type="button" data-sc="out:${i}">✕</button></span>`).join("")+
+    coCartReturns.map((l,i)=>`<span class="chip">⤺ ${esc(l.assetName)}<button type="button" data-sc="in:${i}">✕</button></span>`).join("");
+  const btn=$("#scan-done");
+  btn.hidden=scanMode!=="cart";
+  btn.disabled=!(coCart.length+coCartReturns.length);
+  btn.textContent=!(coCart.length+coCartReturns.length)?"Done"
+    :(coCart.length?"Check out "+coCart.length:"")+(coCart.length&&coCartReturns.length?" · ":"")+(coCartReturns.length?"check in "+coCartReturns.length:"");
+}
+function cartAdd(a){
+  const loan=activeLoan(a.id);
+  if(loan){
+    if(coCartReturns.some(l=>l.id===loan.id)){scanMsg(a.name+" is already in the cart.");return;}
+    coCartReturns.push(loan);
+  }else{
+    if(coCart.some(x=>x.id===a.id)){scanMsg(a.name+" is already in the cart.");return;}
+    coCart.push(a);
+  }
+  beep();scanMsg("");updateScanCart();
+}
+
+function stopScan(){
+  clearTimeout(scanTick);scanTick=0;
+  scanMode=null;scanSerialCb=null;
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  $("#scan-video").srcObject=null;
+  if($("#scan-dlg").open)$("#scan-dlg").close();
+}
+
+async function startScan(mode,cb){
+  scanMode=mode;scanSerialCb=cb||null;
+  scanMsg("");
+  const ov=$("#scan-ov");ov.getContext("2d").clearRect(0,0,ov.width,ov.height);
+  $("#scan-title").textContent=mode==="photo"?"Take photo":mode==="serial"?"Scan serial":"Scan assets";
+  $("#scan-hint").textContent=mode==="photo"?"Frame the asset, then press Capture."
+    :mode==="serial"?"Point at the serial sticker — QR code or barcode."
+    :"Scan one label after another — each beep adds it to the cart.";
+  $("#scan-shutter").hidden=mode!=="photo";
+  $("#scan-cart").hidden=true;
+  $("#scan-fallback").hidden=true;
+  if(mode==="cart")updateScanCart();else $("#scan-done").hidden=true;
+  $("#scan-cancel").textContent=mode==="photo"?"Done":"Cancel";
+  $("#scan-dlg").showModal();
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:"environment",width:{ideal:mode==="photo"?1920:1280},height:{ideal:mode==="photo"?1080:720}},audio:false});
+  }catch(e){
+    // Camera blocked (e.g. embedded page) — fall back to photo-input decoding.
+    if(mode==="photo"){scanMsg("Camera unavailable ("+(e.name||e)+"). Use Add photos instead.");return;}
+    scanMsg("Live camera unavailable ("+(e.name||e)+"). Take a photo of the code instead:");
+    $("#scan-fallback").hidden=false;
+    return;
+  }
+  if(!$("#scan-dlg").open)return stopScan();
+  const video=$("#scan-video");
+  video.srcObject=scanStream;
+  await video.play().catch(()=>{});
+  if(mode==="photo")return;                       // still camera — shutter does the rest
+  runDecodeLoop(video);
+}
+
+const WIDE_NATIVE=["qr_code","data_matrix","code_128","code_39","ean_13","itf"];
+const WIDE_ZXING=["QRCode","DataMatrix","Code128","Code39","EAN-13","ITF"];
+async function makeDetector(){
+  if(window.BarcodeDetector){
+    try{
+      const sup=await BarcodeDetector.getSupportedFormats();
+      const want=(scanMode==="serial"?WIDE_NATIVE:["qr_code"]).filter(f=>sup.includes(f));
+      if(want.includes("qr_code"))return {native:new BarcodeDetector({formats:want})};
+    }catch(e){}
+  }
+  try{return {zx:await loadZXing()};}catch(e){return null;}
+}
+async function decodeFrom(det,source,w,h,canvas,cx){
+  // returns [{text,corners,cx,cy}]
+  const center=(text,c)=>({text,corners:c,cx:c.reduce((s,p)=>s+p.x,0)/4,cy:c.reduce((s,p)=>s+p.y,0)/4});
+  if(det.native){
+    try{
+      const found=await det.native.detect(source);
+      return found.map(f=>center(f.rawValue,f.cornerPoints));
+    }catch(e){return [];}
+  }
+  canvas.width=w;canvas.height=h;
+  cx.drawImage(source,0,0,w,h);
+  try{
+    const r=await det.zx.readBarcodes(cx.getImageData(0,0,w,h),
+      {formats:scanMode==="serial"?WIDE_ZXING:["QRCode"],maxNumberOfSymbols:8,tryHarder:true});
+    return r.filter(x=>x.isValid).map(x=>center(x.text,[x.position.topLeft,x.position.topRight,x.position.bottomRight,x.position.bottomLeft]));
+  }catch(e){return [];}
+}
+function drawScanBoxes(codes,bestText,dw,dh){
+  const ov=$("#scan-ov"),og=ov.getContext("2d");
+  const video=$("#scan-video");
+  const cw=ov.clientWidth,ch=ov.clientHeight;
+  if(ov.width!==cw)ov.width=cw; if(ov.height!==ch)ov.height=ch;
+  og.clearRect(0,0,cw,ch);
+  if(!codes.length||!dw)return;
+  const vr=video.getBoundingClientRect(),br=ov.getBoundingClientRect();
+  const s=Math.min(vr.width/dw,vr.height/dh);
+  const dx=vr.left-br.left+(vr.width-dw*s)/2, dy=vr.top-br.top+(vr.height-dh*s)/2;
+  for(const c of codes){
+    og.beginPath();
+    c.corners.forEach((p,i)=>i?og.lineTo(p.x*s+dx,p.y*s+dy):og.moveTo(p.x*s+dx,p.y*s+dy));
+    og.closePath();
+    const best=c.text===bestText;
+    og.lineWidth=best?4:2;
+    og.strokeStyle=best?"#30d158":"rgba(255,255,255,.55)";
+    if(best){og.fillStyle="rgba(48,209,88,.16)";og.fill();}
+    og.stroke();
+  }
+}
+function handleCode(text){
+  if(scanMode==="serial"){
+    const cb=scanSerialCb;beep();stopScan();if(cb)cb(text);
+    return true;
+  }
+  const a=assetByCode(text);
+  if(a)cartAdd(a);
+  else scanMsg("No registered asset matches this code.");
+  return false;
+}
+async function runDecodeLoop(video){
+  const det=await makeDetector();
+  if(!det){scanMsg("No QR decoder available — check your connection.");return;}
+  const canvas=document.createElement("canvas");
+  const cx=canvas.getContext("2d",{willReadFrequently:true});
+  const tick=async()=>{
+    if(!scanStream)return;
+    if(video.readyState>=2&&video.videoWidth){
+      const dw=video.videoWidth,dh=video.videoHeight;
+      const codes=await decodeFrom(det,video,dw,dh,canvas,cx);
+      let best=null,bd=Infinity;
+      for(const c of codes){const d=(c.cx-dw/2)**2+(c.cy-dh/2)**2;if(d<bd){bd=d;best=c;}}
+      drawScanBoxes(codes,best&&best.text,dw,dh);
+      if(best){
+        const now=Date.now();
+        if(best.text!==lastScan.code||now-lastScan.t>2500){
+          lastScan={code:best.text,t:now};
+          if(handleCode(best.text))return;
+        }
+      }
+    }
+    scanTick=setTimeout(tick,70);
+  };
+  tick();
+}
+// Fallback when live camera is blocked: decode a snapped/picked photo.
+$("#scan-photo").addEventListener("change",async()=>{
+  const file=$("#scan-photo").files&&$("#scan-photo").files[0];
+  $("#scan-photo").value="";
+  if(!file)return;
+  scanMsg("Reading…");
+  try{
+    const det=await makeDetector();
+    const im=await new Promise((res,rej)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=u;});
+    const canvas=document.createElement("canvas");
+    const cx=canvas.getContext("2d",{willReadFrequently:true});
+    const s=Math.min(1,1600/Math.max(im.width,im.height));
+    const codes=await decodeFrom(det,im,Math.round(im.width*s),Math.round(im.height*s),canvas,cx);
+    if(!codes.length)return scanMsg("No code found in that photo — try closer, more light.");
+    scanMsg("");
+    handleCode(codes[0].text);
+  }catch(e){scanMsg("Couldn't read that photo: "+(e.message||e));}
+});
+
+/* ---- asset photos ---- */
+function renderFPhotos(){$("#f-photos-ev").innerHTML=fPhotos.map(ev=>fileThumb(ev,true)).join("");}
+async function uploadPhotoBlob(blob,name){
+  if(!assetsNs){toast("File upload isn't available for your access level.");return;}
+  try{
+    const r=await assetsNs.upload(new File([blob],name,{type:"image/jpeg"}));
+    fPhotos.push({id:r.id,ct:r.contentType||"image/jpeg",name});
+    renderFPhotos();
+  }catch(err){toast("Couldn't upload photo: "+(err&&err.message||"error"));}
+}
+async function resizeToJpeg(file){
+  const im=await new Promise((res,rej)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error("couldn't read "+file.name));i.src=u;});
+  const s=Math.min(1,1600/Math.max(im.width,im.height));
+  const c=document.createElement("canvas");
+  c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+  c.getContext("2d").drawImage(im,0,0,c.width,c.height);
+  return new Promise(res=>c.toBlob(res,"image/jpeg",.82));
+}
+$("#f-photos").addEventListener("change",async()=>{
+  const files=[...($("#f-photos").files||[])];
+  $("#f-photos").value="";
+  const st=$("#f-photos-status");
+  for(let i=0;i<files.length;i++){
+    st.textContent="Uploading "+(i+1)+"/"+files.length+"…";
+    try{await uploadPhotoBlob(await resizeToJpeg(files[i]),files[i].name.replace(/\.[^.]+$/,"")+".jpg");}
+    catch(e){toast(String(e.message||e));}
+  }
+  st.textContent="";
+});
+$("#f-photos-ev").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-evrm]");if(!b)return;
+  fPhotos=fPhotos.filter(x=>x.id!==b.dataset.evrm);
+  fRemovedPhotos.push(b.dataset.evrm);
+  renderFPhotos();
+});
+$("#f-take").addEventListener("click",()=>startScan("photo"));
+$("#scan-shutter").addEventListener("click",async()=>{
+  const video=$("#scan-video");
+  if(!video.videoWidth)return;
+  const s=Math.min(1,1600/Math.max(video.videoWidth,video.videoHeight));
+  const c=document.createElement("canvas");
+  c.width=Math.round(video.videoWidth*s);c.height=Math.round(video.videoHeight*s);
+  c.getContext("2d").drawImage(video,0,0,c.width,c.height);
+  beep();
+  const blob=await new Promise(res=>c.toBlob(res,"image/jpeg",.85));
+  $("#scan-hint").textContent="Uploading…";
+  await uploadPhotoBlob(blob,"photo-"+Date.now()+".jpg");
+  $("#scan-hint").textContent=fPhotos.length+(fPhotos.length===1?" photo":" photos")+" — capture more or press Done.";
+});
+$("#f-serial-scan").addEventListener("click",()=>startScan("serial",code=>{$("#f-serial").value=code;}));
+
+/* ---- scanner wiring ---- */
+$("#btn-scan").addEventListener("click",()=>startScan("cart"));
+$("#scan-cancel").addEventListener("click",stopScan);
+$("#scan-dlg").addEventListener("close",stopScan);
+$("#scan-done").addEventListener("click",()=>{stopScan();openCheckoutCart();});
+$("#scan-cart").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-sc]");if(!b)return;
+  const [k,i]=b.dataset.sc.split(":");
+  if(k==="out")coCart.splice(+i,1);else coCartReturns.splice(+i,1);
+  updateScanCart();
+});
+$("#co-cart").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-cartrm]");if(!b)return;
+  coCart.splice(+b.dataset.cartrm,1);
+  if(coCart.length||coCartReturns.length)openCheckoutCart();else closeCheckoutForm();
+});
+
+/* ---- QR labels (print sheet) ---- */
+let labelsFrom="assets";
+async function showLabels(){
+  if(!window.QRCode){
+    try{await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js");}
+    catch(e){toast(e.message);return;}
+  }
+  const grid=$("#labelgrid");grid.innerHTML="";
+  const list=assets.filter(assetMatches).sort((a,b)=>(CAT_RANK[a.category]??9)-(CAT_RANK[b.category]??9)||String(a.name||"").localeCompare(String(b.name||"")));
+  for(const a of list){
+    const d=document.createElement("div");d.className="label";
+    const q=document.createElement("div");q.className="lqr";
+    new QRCode(q,{text:qrPayload(a),width:96,height:96,correctLevel:QRCode.CorrectLevel.M});
+    d.appendChild(q);
+    const n=document.createElement("div");n.className="ln";n.textContent=a.name||"(unnamed)";d.appendChild(n);
+    if(a.serial){const s=document.createElement("div");s.className="ls";s.textContent="SN "+a.serial;d.appendChild(s);}
+    grid.appendChild(d);
+  }
+  labelsFrom=(location.hash||"").replace("#","")||"assets";
+  document.body.classList.add("labels-mode");
+  for(const w of VIEWS)$("#view-"+w).hidden=true;
+  $("#view-labels").hidden=false;
+  window.scrollTo(0,0);
+}
+function hideLabels(){
+  document.body.classList.remove("labels-mode");
+  $("#view-labels").hidden=true;
+  showView();
+}
+$("#btn-labels").addEventListener("click",showLabels);
+$("#labels-back").addEventListener("click",hideLabels);
+$("#labels-print").addEventListener("click",()=>window.print());
+
+/* ---- ?scan= deep link (labels scanned with a phone camera) ---- */
+let pendingScan=new URLSearchParams(location.search).get("scan")||"";
+if(pendingScan)history.replaceState(null,"",location.pathname+location.hash);
+function tryPendingScan(){
+  if(!pendingScan||!loaded||!coLoaded)return;
+  const a=assetByCode(pendingScan);
+  pendingScan="";
+  if(!a){toast("No registered asset matches the scanned code.");return;}
+  location.hash="checkout";showView();
+  if(!canWrite){toast(a.name+(activeLoan(a.id)?" is currently out.":" is available."));return;}
+  cartAdd(a);
+  openCheckoutCart();
+}
 
 /* ================= PEOPLE ================= */
 const CERT_SOON_DAYS=30;
